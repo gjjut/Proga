@@ -32,6 +32,7 @@ import {
   addDays,
   formatDateWithWeekday,
   formatMoney,
+  formatMinusMoney,
   formatPercent,
   formatSignedMoney,
   moneyToInput,
@@ -563,11 +564,13 @@ export function DayEntry() {
             </div>
             <div className="summary-row">
               <span>Комиссия банка {formatPercent(rate)}</span>
-              <strong className="is-negative">−{formatMoney(commission)}</strong>
+              <strong className={commission > 0 ? 'is-negative' : undefined}>
+                {formatMinusMoney(commission)}
+              </strong>
             </div>
             <div className="summary-row">
               <span>В НЗ</span>
-              <strong>−{formatMoney(reserveValue)}</strong>
+              <strong>{formatMinusMoney(reserveValue)}</strong>
             </div>
           </div>
 

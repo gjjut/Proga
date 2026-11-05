@@ -19,6 +19,7 @@ import {
 import {
   formatDateLong,
   formatDateWithWeekday,
+  formatMinusMoney,
   formatMoney,
   formatNumber,
   formatPercent,
@@ -331,7 +332,9 @@ export function History() {
                   </div>
                   <div className="record__stat">
                     <span>Комиссия {formatPercent(rate)}</span>
-                    <strong className="is-negative">−{formatMoney(metrics.commission)}</strong>
+                    <strong className={metrics.commission > 0 ? 'is-negative' : undefined}>
+                      {formatMinusMoney(metrics.commission)}
+                    </strong>
                   </div>
                   <div className="record__stat">
                     <span>Итог дня</span>

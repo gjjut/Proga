@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDays,
+  formatMinusMoney,
   formatMoney,
   formatPercent,
   formatSignedMoney,
@@ -86,5 +87,12 @@ describe('formatPercent и formatSignedMoney', () => {
     expect(formatSignedMoney(1500)).toBe('+1\u00A0500\u00A0₽');
     expect(formatSignedMoney(-1500)).toBe('−1\u00A0500\u00A0₽');
     expect(formatSignedMoney(0)).toBe('0\u00A0₽');
+  });
+});
+
+describe('formatMinusMoney', () => {
+  it('пишет минус только для ненулевых вычетов', () => {
+    expect(formatMinusMoney(1325.5)).toBe('−1\u00A0325,5\u00A0₽');
+    expect(formatMinusMoney(0)).toBe('0\u00A0₽');
   });
 });

@@ -310,7 +310,9 @@ export function Adjustments() {
         </div>
         <div className="summary-strip__item">
           <span>Забрали</span>
-          <strong className="is-negative">{formatMoney(visibleOut)}</strong>
+          <strong className={visibleOut > 0 ? 'is-negative' : undefined}>
+            {formatMoney(visibleOut)}
+          </strong>
         </div>
         <div className="summary-strip__item">
           <span>Влияние на остаток</span>
