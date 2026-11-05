@@ -332,9 +332,7 @@ export function History() {
                   </div>
                   <div className="record__stat">
                     <span>Комиссия {formatPercent(rate)}</span>
-                    <strong className={metrics.commission > 0 ? 'is-negative' : undefined}>
-                      {formatMinusMoney(metrics.commission)}
-                    </strong>
+                    <strong>{formatMinusMoney(metrics.commission)}</strong>
                   </div>
                   <div className="record__stat">
                     <span>Итог дня</span>
