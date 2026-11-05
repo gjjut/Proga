@@ -74,11 +74,11 @@ export function Sidebar() {
         <button
           type="button"
           className="btn btn--ghost btn--icon"
-          onClick={() => void updateSettings({ theme: theme === 'dim' ? 'black' : 'dim' })}
-          title={theme === 'dim' ? 'Включить чёрную тему' : 'Вернуть тему Dim'}
-          aria-label={theme === 'dim' ? 'Включить чёрную тему' : 'Вернуть тему Dim'}
+          onClick={() => void updateSettings({ theme: theme === 'light' ? 'black' : 'light' })}
+          title={theme === 'light' ? 'Включить чёрную тему' : 'Включить белую тему'}
+          aria-label={theme === 'light' ? 'Включить чёрную тему' : 'Включить белую тему'}
         >
-          {theme === 'dim' ? <MoonIcon size={18} /> : <SunIcon size={18} />}
+          {theme === 'light' ? <MoonIcon size={18} /> : <SunIcon size={18} />}
         </button>
         <span className="sidebar__version">
           v{version}

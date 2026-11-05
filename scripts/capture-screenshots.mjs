@@ -52,12 +52,10 @@ await shot('dashboard');
 await navTo('Запись дня');
 await page.waitForSelector('.day-summary');
 
-// 0 — остаток наличных вчера, 1 — терминал, 2 — факт в кассе, 3 — НЗ
-const moneyInputs = page.locator('input.input--money');
-await fill(moneyInputs.nth(0), '10000');
-await fill(moneyInputs.nth(1), '48200');
-await fill(moneyInputs.nth(2), '9600');
-await fill(moneyInputs.nth(3), '4500');
+await fill(page.locator('input[aria-label="Остаток наличных предыдущего дня"]'), '10000');
+await fill(page.locator('input[aria-label="Сумма по терминалу"]'), '48200');
+await fill(page.locator('input[aria-label="Фактическое наличие наличных в кассе"]'), '9600');
+await fill(page.locator('input[aria-label="Сумма, положенная в НЗ"]'), '4500');
 
 await fill(page.locator('.expense-row__amount input').first(), '3400');
 await fill(page.locator('.expense-row__comment').first(), 'Корм и прикормка, база на Ленина');
@@ -86,17 +84,17 @@ await navTo('Настройки');
 await page.waitForSelector('.theme-option');
 await shot('settings');
 
-// ── Вторая тема (графит) ──
+// ── Вторая тема (белая) ──
 // Не считаем критичным: если кнопка не нашлась, просто пропускаем кадры.
 try {
-  await page.locator('.theme-option', { hasText: 'Графит' }).first().click();
+  await page.locator('.theme-option', { hasText: 'Белая' }).first().click();
   await page.waitForTimeout(400);
-  await shot('settings-dim');
+  await shot('settings-light');
   await navTo('Главное');
   await page.waitForSelector('.hero, .empty-state', { timeout: 20000 });
-  await shot('dashboard-dim');
+  await shot('dashboard-light');
 } catch (error) {
-  console.warn('Тему «Графит» снять не удалось:', error.message);
+  console.warn('Тему «Белая» снять не удалось:', error.message);
 }
 
 await browser.close();

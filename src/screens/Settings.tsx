@@ -27,20 +27,22 @@ const PLATFORM_LABELS: Record<string, string> = {
 const REPO_URL = 'https://github.com/gjjut/Proga';
 const RELEASES_URL = `${REPO_URL}/releases`;
 
-const THEMES: { id: ThemeMode; title: string; subtitle: string; bg: string; surface: string }[] = [
+const THEMES: { id: ThemeMode; title: string; subtitle: string; bg: string; surface: string; line: string }[] = [
   {
     id: 'black',
     title: 'Чёрная',
-    subtitle: 'Как Lights out в X: чистый чёрный и белый · #000000',
+    subtitle: 'Чёрный фон, белый текст · #000000',
     bg: '#000000',
     surface: '#141619',
+    line: '#ffffff',
   },
   {
-    id: 'dim',
-    title: 'Графит',
-    subtitle: 'Мягкий тёмно-серый без цветных акцентов · #16181C',
-    bg: '#16181C',
-    surface: '#1C1F24',
+    id: 'light',
+    title: 'Белая',
+    subtitle: 'Белый фон, чёрный текст · #FFFFFF',
+    bg: '#FFFFFF',
+    surface: '#F2F3F4',
+    line: '#0f1419',
   },
 ];
 
@@ -119,8 +121,14 @@ export function Settings() {
               >
                 <span className="theme-option__preview" style={{ background: item.bg }}>
                   <span className="theme-option__preview-card" style={{ background: item.surface }} />
-                  <span className="theme-option__preview-line" />
-                  <span className="theme-option__preview-line theme-option__preview-line--short" />
+                  <span
+                    className="theme-option__preview-line"
+                    style={{ background: item.line }}
+                  />
+                  <span
+                    className="theme-option__preview-line theme-option__preview-line--short"
+                    style={{ background: item.line, opacity: 0.5 }}
+                  />
                 </span>
                 <span className="theme-option__text">
                   <strong>

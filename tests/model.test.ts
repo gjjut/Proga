@@ -60,6 +60,15 @@ describe('миграция и нормализация', () => {
     expect(data.schemaVersion).toBe(SCHEMA_VERSION);
   });
 
+  it('мигрирует удалённую тему «Графит» (dim) в чёрную', () => {
+    const data = normalizeData({
+      schemaVersion: SCHEMA_VERSION,
+      settings: { theme: 'dim', lastCompany: 'zaton' },
+    });
+
+    expect(data.settings.theme).toBe('black');
+  });
+
   it('поднимает старую схему v1: cash → cashFact и заполняет остаток вчера', () => {
     const data = normalizeData({
       schemaVersion: 1,

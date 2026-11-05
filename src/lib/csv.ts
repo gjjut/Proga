@@ -175,8 +175,12 @@ export function buildCsv(
   lines.push(row([`Комиссия банка (${numCell(rate)}%)`, totals.commission]));
   lines.push(row(['Расходы', totals.expenses]));
   lines.push(row(['НЗ накоплено', totals.reserve]));
-  lines.push(row(['Наличные в кассе', totals.cash]));
-  lines.push(row(['Свободный остаток', totals.balance]));
+  lines.push(row(['Наличные в кассе', totals.pots.cash]));
+  lines.push(row(['На терминале (за вычетом комиссии)', totals.pots.terminal]));
+  lines.push(row(['В НЗ', totals.pots.reserve]));
+  lines.push(row(['Общий остаток (наличные + терминал + НЗ)', totals.pots.total]));
+  lines.push(row(['Свободно без НЗ', totals.pots.free]));
+  lines.push(row(['Свободный остаток (выручка − комиссия − НЗ)', totals.balance]));
   lines.push(row(['Записей дней', totals.records]));
   lines.push(row(['Строк расходов', totals.expenseCount]));
 

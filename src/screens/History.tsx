@@ -159,7 +159,10 @@ export function History() {
                 className={`chip${company === item.id ? ' is-active' : ''}`}
                 style={
                   company === item.id
-                    ? { borderColor: `${item.accent}80`, color: item.accent }
+                    ? {
+                        borderColor: `color-mix(in srgb, ${item.accent} 45%, transparent)`,
+                        color: item.accent,
+                      }
                     : undefined
                 }
                 onClick={() => setCompany(item.id)}
@@ -245,17 +248,21 @@ export function History() {
           <strong>{formatMoney(totals.expenses)}</strong>
         </div>
         <div className="summary-strip__item">
-          <span>НЗ</span>
-          <strong>{formatMoney(totals.reserve)}</strong>
+          <span>Наличные</span>
+          <strong>{formatMoney(totals.pots.cash)}</strong>
         </div>
         <div className="summary-strip__item">
-          <span>Наличные в кассе</span>
-          <strong>{formatMoney(totals.cash)}</strong>
+          <span>На терминале</span>
+          <strong>{formatMoney(totals.pots.terminal)}</strong>
         </div>
         <div className="summary-strip__item">
-          <span>Остаток</span>
-          <strong className={totals.balance < 0 ? 'is-negative' : ''}>
-            {formatMoney(totals.balance)}
+          <span>В НЗ</span>
+          <strong>{formatMoney(totals.pots.reserve)}</strong>
+        </div>
+        <div className="summary-strip__item">
+          <span>Общий остаток</span>
+          <strong className={totals.pots.total < 0 ? 'is-negative' : ''}>
+            {formatMoney(totals.pots.total)}
           </strong>
         </div>
       </section>

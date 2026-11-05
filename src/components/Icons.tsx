@@ -217,6 +217,15 @@ export function ShieldIcon(props: IconProps) {
   );
 }
 
+export function ReceiptIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z" />
+      <path d="M9.5 8h5M9.5 12h5" />
+    </Icon>
+  );
+}
+
 export function BanknoteIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -289,8 +298,8 @@ export function CompanyMark({
       style={{
         width: size,
         height: size,
-        borderColor: `${accent}59`,
-        background: `${accent}1A`,
+        borderColor: `color-mix(in srgb, ${accent} 35%, transparent)`,
+        background: `color-mix(in srgb, ${accent} 12%, transparent)`,
         color: accent,
         fontSize: size * 0.42,
       }}
