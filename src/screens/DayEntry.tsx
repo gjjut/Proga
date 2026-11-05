@@ -564,9 +564,7 @@ export function DayEntry() {
             </div>
             <div className="summary-row">
               <span>Комиссия банка {formatPercent(rate)}</span>
-              <strong className={commission > 0 ? 'is-negative' : undefined}>
-                {formatMinusMoney(commission)}
-              </strong>
+              <strong>{formatMinusMoney(commission)}</strong>
             </div>
             <div className="summary-row">
               <span>В НЗ</span>
