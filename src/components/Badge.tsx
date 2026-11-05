@@ -13,8 +13,8 @@ export function CompanyBadge({
       className="company-badge"
       style={{
         color: meta.accent,
-        borderColor: `${meta.accent}4D`,
-        background: `${meta.accent}14`,
+        borderColor: `color-mix(in srgb, ${meta.accent} 30%, transparent)`,
+        background: `color-mix(in srgb, ${meta.accent} 10%, transparent)`,
       }}
     >
       {withDot ? <span className="company-badge__dot" style={{ background: meta.accent }} /> : null}

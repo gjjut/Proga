@@ -11,7 +11,7 @@
  */
 
 export type CompanyId = 'zaton' | 'artfokus';
-export type ThemeMode = 'dim' | 'black';
+export type ThemeMode = 'black' | 'light';
 export type AdjustmentTarget = 'cash' | 'terminal' | 'reserve';
 export type AdjustmentDirection = 'in' | 'out';
 
@@ -101,13 +101,13 @@ export const COMPANIES: readonly Company[] = [
     id: 'zaton',
     name: 'Затон Рыбака',
     description: 'Рыболовная база',
-    accent: '#FFFFFF',
+    accent: 'var(--company-zaton)',
   },
   {
     id: 'artfokus',
     name: 'Арт Фокус',
     description: 'Творческая студия',
-    accent: '#9AA1A8',
+    accent: 'var(--company-artfokus)',
   },
 ] as const;
 
@@ -131,7 +131,7 @@ export function companyById(id: CompanyId): Company {
 }
 
 export function isThemeMode(value: unknown): value is ThemeMode {
-  return value === 'dim' || value === 'black';
+  return value === 'black' || value === 'light';
 }
 
 export function newId(): string {
@@ -296,7 +296,12 @@ export function normalizeData(raw: unknown): AppData {
     records,
     adjustments,
     settings: {
-      theme: isThemeMode(settingsSource.theme) ? settingsSource.theme : 'black',
+      // Старые значения темы: 'dim' (графит) → 'black', неизвестное → 'black'.
+      theme: isThemeMode(settingsSource.theme)
+        ? settingsSource.theme
+        : settingsSource.theme === 'dim'
+          ? 'black'
+          : 'black',
       lastCompany: isCompanyId(settingsSource.lastCompany) ? settingsSource.lastCompany : 'zaton',
       commissionRate,
     },

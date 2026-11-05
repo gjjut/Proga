@@ -79,7 +79,11 @@ describe('buildCsv', () => {
     expect(csv).toContain('Комиссия банка (2,75%);1325,50');
     expect(csv).toContain('НЗ накоплено;4500,00');
     expect(csv).toContain('Наличные в кассе;9600,00');
-    expect(csv).toContain('Свободный остаток;45374,50');
+    expect(csv).toContain('На терминале (за вычетом комиссии);46874,50');
+    expect(csv).toContain('В НЗ;4500,00');
+    expect(csv).toContain('Общий остаток (наличные + терминал + НЗ);60974,50');
+    expect(csv).toContain('Свободно без НЗ;56474,50');
+    expect(csv).toContain('Свободный остаток (выручка − комиссия − НЗ);45374,50');
   });
 
   it('выгружает движения отдельным блоком', () => {
@@ -133,7 +137,8 @@ describe('buildCsv', () => {
   it('работает на пустой выборке', () => {
     const csv = buildCsv([], [], { commissionRate: RATE, from: '2025-11-01', to: '2025-11-30' });
     expect(csv).toContain('Период;01.11.2025 — 30.11.2025');
-    expect(csv).toContain('Свободный остаток;0,00');
+    expect(csv).toContain('Свободный остаток (выручка − комиссия − НЗ);0,00');
+    expect(csv).toContain('Общий остаток (наличные + терминал + НЗ);0,00');
   });
 });
 

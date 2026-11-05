@@ -130,7 +130,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = data.settings.theme;
-    document.documentElement.style.colorScheme = 'dark';
+    document.documentElement.style.colorScheme =
+      data.settings.theme === 'light' ? 'light' : 'dark';
   }, [data.settings.theme]);
 
   const navigate = useCallback((next: ScreenId, target?: DayTarget | null) => {

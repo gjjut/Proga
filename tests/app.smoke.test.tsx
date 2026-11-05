@@ -45,6 +45,10 @@ function buttonByText(text: string): HTMLButtonElement | undefined {
   );
 }
 
+function moneyByLabel(label: string): HTMLInputElement | null {
+  return container.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
+}
+
 function stored(): StoredData {
   return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as StoredData;
 }
@@ -90,10 +94,13 @@ describe('Приложение целиком', () => {
     expect(text).toContain('Главное');
     expect(text).toContain('Затон Рыбака');
     expect(text).toContain('Арт Фокус');
-    expect(text).toContain('Остаток по двум компаниям');
+    expect(text).toContain('Общий остаток');
     expect(text).toContain('Выручка');
-    expect(text).toContain('Наличные в кассе');
+    expect(text).toContain('Наличные');
+    expect(text).toContain('На терминале');
+    expect(text).toContain('В НЗ');
     expect(text).toContain('Динамика выручки');
+    expect(container.querySelectorAll('.pots__item')).toHaveLength(3);
     expect(container.querySelectorAll('.company-card')).toHaveLength(2);
     expect(container.querySelectorAll('.chart__col').length).toBe(14);
   });
@@ -114,21 +121,28 @@ describe('Приложение целиком', () => {
   it('сохраняет день по новой схеме и считает итог', async () => {
     await navTo('Запись дня');
     expect(container.querySelector('.day-summary')).not.toBeNull();
-    expect(container.textContent).toContain('Итоги дня');
-    expect(container.textContent).toContain('Остаток наличных вчера');
+    expect(container.textContent).toContain('Итог дня');
+    expect(container.textContent).toContain('Было вчера');
+    expect(container.textContent).toContain('Стало (факт)');
 
     const dateInput = container.querySelector<HTMLInputElement>('input[type="date"]');
     expect(dateInput).not.toBeNull();
     if (dateInput) setInputValue(dateInput, '2024-05-06');
     await settle();
 
-    const moneyInputs = [...container.querySelectorAll<HTMLInputElement>('input.input--money')];
-    expect(moneyInputs.length).toBeGreaterThanOrEqual(4);
+    const prevInput = moneyByLabel('Остаток наличных предыдущего дня');
+    const terminalInput = moneyByLabel('Сумма по терминалу');
+    const factInput = moneyByLabel('Фактическое наличие наличных в кассе');
+    const reserveInput = moneyByLabel('Сумма, положенная в НЗ');
+    expect(prevInput).not.toBeNull();
+    expect(terminalInput).not.toBeNull();
+    expect(factInput).not.toBeNull();
+    expect(reserveInput).not.toBeNull();
     await act(async () => {
-      setInputValue(moneyInputs[0], '5000'); // остаток вчера
-      setInputValue(moneyInputs[1], '48200'); // терминал
-      setInputValue(moneyInputs[2], '9600'); // факт в кассе
-      setInputValue(moneyInputs[3], '4500'); // НЗ
+      if (prevInput) setInputValue(prevInput, '5000');
+      if (terminalInput) setInputValue(terminalInput, '48200');
+      if (factInput) setInputValue(factInput, '9600');
+      if (reserveInput) setInputValue(reserveInput, '4500');
     });
     await settle();
 
@@ -142,8 +156,10 @@ describe('Приложение целиком', () => {
 
     // Итог дня в панели справа: 48200 + (9600 − 5000) + 3400 = 56200
     const summaryText = container.querySelector('.day-summary')?.textContent ?? '';
-    expect(summaryText).toContain('Итоги дня');
+    expect(summaryText).toContain('Итог дня');
     expect(summaryText).toMatch(/56\s?200/);
+    // Остаток дня: 56 200 − 1 325,50 − 4 500 = 50 374,50
+    expect(summaryText).toMatch(/50\s374,5/);
 
     await act(async () => {
       buttonByText('Сохранить день')?.click();
@@ -165,11 +181,13 @@ describe('Приложение целиком', () => {
     const dateInput = container.querySelector<HTMLInputElement>('input[type="date"]');
     if (dateInput) setInputValue(dateInput, '2024-05-07');
     await settle();
-    const moneyInputs = [...container.querySelectorAll<HTMLInputElement>('input.input--money')];
+    const prevInput = moneyByLabel('Остаток наличных предыдущего дня');
+    const terminalInput = moneyByLabel('Сумма по терминалу');
+    const factInput = moneyByLabel('Фактическое наличие наличных в кассе');
     await act(async () => {
-      setInputValue(moneyInputs[0], '10000');
-      setInputValue(moneyInputs[1], '20000');
-      setInputValue(moneyInputs[2], '10000');
+      if (prevInput) setInputValue(prevInput, '10000');
+      if (terminalInput) setInputValue(terminalInput, '20000');
+      if (factInput) setInputValue(factInput, '10000');
     });
     await settle();
     await act(async () => {
@@ -243,7 +261,7 @@ describe('Приложение целиком', () => {
     expect(container.querySelector('.screen__subtitle')?.textContent).toContain('Арт Фокус');
   });
 
-  it('стартует в чёрной теме и переключает на «Графит»', async () => {
+  it('стартует в чёрной теме и переключает на белую', async () => {
     // Чёрно-белая тема — тема по умолчанию.
     expect(document.documentElement.dataset.theme).toBe('black');
 
@@ -251,16 +269,16 @@ describe('Приложение целиком', () => {
 
     expect(container.textContent).toContain('Оформление');
     expect(container.textContent).toContain('Чёрная');
-    expect(container.textContent).toContain('Графит');
+    expect(container.textContent).toContain('Белая');
     expect(container.textContent).toContain('Комиссия банка');
     expect(container.textContent).toContain('Как считаются показатели');
 
     await act(async () => {
-      buttonByText('Графит')?.click();
+      buttonByText('Белая')?.click();
     });
     await settle(80);
-    expect(document.documentElement.dataset.theme).toBe('dim');
-    expect(stored().settings?.theme).toBe('dim');
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(stored().settings?.theme).toBe('light');
 
     await act(async () => {
       buttonByText('Чёрная')?.click();

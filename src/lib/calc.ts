@@ -88,6 +88,22 @@ export interface AdjustmentImpact {
   commission: number;
 }
 
+/**
+ * Где лежат деньги (остатки, а не начисления):
+ *   наличные — физический остаток кассы,
+ *   терминал — пришло по терминалу минус комиссия банка и изъятия,
+ *   НЗ       — отложено в неприкосновенный запас.
+ * Общий остаток = наличные + терминал + НЗ.
+ */
+export interface Pots {
+  cash: number;
+  terminal: number;
+  reserve: number;
+  total: number;
+  /** Свободные деньги без НЗ: наличные + терминал */
+  free: number;
+}
+
 export interface Totals {
   /** Выручка: сумма итогов дней */
   revenue: number;
@@ -106,6 +122,8 @@ export interface Totals {
   lastDate: string | null;
   adjustments: AdjustmentImpact;
   commissionRate: number;
+  /** Разбивка остатка: наличные / терминал / НЗ */
+  pots: Pots;
 }
 
 export const EMPTY_IMPACT: AdjustmentImpact = {
@@ -130,6 +148,7 @@ export const EMPTY_TOTALS: Totals = {
   lastDate: null,
   adjustments: { ...EMPTY_IMPACT },
   commissionRate: DEFAULT_COMMISSION_RATE,
+  pots: { cash: 0, terminal: 0, reserve: 0, total: 0, free: 0 },
 };
 
 function laterRecord(current: DayRecord | undefined, candidate: DayRecord): DayRecord {
@@ -161,6 +180,7 @@ export function totalsOf(
   let expenses = 0;
   let expenseCount = 0;
   let reserveDeposits = 0;
+  let terminalGross = 0;
   let lastDate: string | null = null;
 
   for (const record of records) {
@@ -170,6 +190,7 @@ export function totalsOf(
     expenses += metrics.expenses;
     expenseCount += record.expenses.length;
     reserveDeposits += record.reserve;
+    terminalGross += record.terminal;
     if (!lastDate || record.date > lastDate) lastDate = record.date;
   }
 
@@ -221,6 +242,7 @@ export function totalsOf(
   const reserve = round2(reserveDeposits + reserveAdjustments);
   // Комиссия в сводке — полная: и по дням, и с поступлений через терминал.
   const commissionTotal = round2(commission + impact.commission);
+  const terminalPot = round2(terminalGross - commissionTotal + impact.terminalGrossNet);
   const balance = round2(
     revenue - commissionTotal - reserve + impact.cashNet + impact.terminalGrossNet,
   );
@@ -235,6 +257,13 @@ export function totalsOf(
     records: records.length,
     expenseCount,
     lastDate,
+    pots: {
+      cash: round2(cash),
+      terminal: terminalPot,
+      reserve,
+      total: round2(round2(cash) + terminalPot + reserve),
+      free: round2(round2(cash) + terminalPot),
+    },
     adjustments: {
       inTotal: round2(impact.inTotal),
       outTotal: round2(impact.outTotal),
