@@ -10,6 +10,7 @@ on:
       - 'index.html'
       - 'assets/**'
       - 'scripts/capture-screenshots.mjs'
+      - '.github/workflows/screenshots.yml'
 
 permissions:
   contents: write
