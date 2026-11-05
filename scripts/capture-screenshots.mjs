@@ -33,6 +33,11 @@ async function shot(name) {
   console.log(`✓ ${OUT_DIR}/${name}.png`);
 }
 
+/** Клик по пункту левого меню (в шапке экранов бывают одноимённые кнопки). */
+async function navTo(label) {
+  await page.locator('.nav__item', { hasText: label }).first().click();
+}
+
 async function fill(locator, value) {
   await locator.click();
   await locator.fill(value);
@@ -44,7 +49,7 @@ await page.waitForSelector('.hero', { timeout: 30000 });
 await shot('dashboard');
 
 // ── Запись дня: заполняем поля, чтобы на скриншоте были живые цифры ──
-await page.getByRole('button', { name: 'Запись дня', exact: true }).click();
+await navTo('Запись дня');
 await page.waitForSelector('.day-summary');
 
 const moneyInputs = page.locator('input.input--money');
@@ -62,20 +67,20 @@ await page.locator('.screen__title').click();
 await shot('day-entry');
 
 // ── История ──
-await page.getByRole('button', { name: 'История', exact: true }).click();
+await navTo('История');
 await page.waitForSelector('.record-list');
 await page.locator('.record__toggle').first().click();
 await shot('history');
 
 // ── Настройки ──
-await page.getByRole('button', { name: 'Настройки', exact: true }).click();
+await navTo('Настройки');
 await page.waitForSelector('.theme-option');
 await shot('settings');
 
 // ── Чёрная тема ──
 await page.locator('.theme-option', { hasText: 'Lights out' }).click();
 await page.waitForTimeout(300);
-await page.getByRole('button', { name: 'Главное', exact: true }).click();
+await navTo('Главное');
 await page.waitForSelector('.hero');
 await shot('dashboard-black');
 
