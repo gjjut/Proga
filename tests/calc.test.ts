@@ -211,6 +211,9 @@ describe('движения денег', () => {
     );
     expect(totals.adjustments.commission).toBe(660); // 24000 × 2,75%
     expect(totals.adjustments.terminalNet).toBe(23340);
+    expect(totals.adjustments.terminalGrossNet).toBe(24000);
+    // Комиссия в сводке учитывает и поступления через терминал.
+    expect(totals.commission).toBe(2700.5 + 660);
     expect(totals.balance).toBe(108199.5 + 23340);
   });
 
@@ -221,7 +224,9 @@ describe('движения денег', () => {
       RATE,
     );
     expect(totals.adjustments.terminalNet).toBe(-5000);
+    expect(totals.adjustments.terminalGrossNet).toBe(-5000);
     expect(totals.adjustments.commission).toBe(0);
+    expect(totals.commission).toBe(2700.5);
   });
 
   it('не меняет выручку', () => {

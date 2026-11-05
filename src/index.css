@@ -3,23 +3,24 @@
    ══════════════════════════════════════════════════════════════ */
 
 :root {
-  --bg: #15202b;
-  --bg-deep: #101922;
-  --surface: #1e2732;
-  --surface-2: #233240;
-  --surface-hover: #22303d;
-  --border: #2f3336;
-  --border-strong: #3a444e;
+  /* Монохромная палитра в духе X: только чёрный, белый и градации серого. */
+  --bg: #16181c;
+  --bg-deep: #0d0f12;
+  --surface: #1c1f24;
+  --surface-2: #24282e;
+  --surface-hover: #2a2e35;
+  --border: #30343a;
+  --border-strong: #464b52;
   --text: #ffffff;
-  --text-secondary: #71767b;
-  --text-tertiary: #5c6b78;
-  --accent: #1d9bf0;
-  --accent-hover: #1a8cd8;
-  --accent-soft: rgba(29, 155, 240, 0.12);
-  --pink: #f91880;
-  --danger: #f4212e;
-  --danger-soft: rgba(244, 33, 46, 0.12);
-  --success: #00ba7c;
+  --text-secondary: #8b9299;
+  --text-tertiary: #6a7178;
+  --accent: #ffffff;
+  --accent-hover: #d7dade;
+  --accent-soft: rgba(255, 255, 255, 0.1);
+  --pink: #a8afb6;
+  --danger: #ffffff;
+  --danger-soft: rgba(255, 255, 255, 0.09);
+  --success: #ffffff;
   --radius-card: 16px;
   --radius-pill: 999px;
   --font: "Segoe UI", "Helvetica Neue", Helvetica, Arial, system-ui, -apple-system, sans-serif;
@@ -29,14 +30,14 @@
 [data-theme='black'] {
   --bg: #000000;
   --bg-deep: #000000;
-  --surface: #16181c;
-  --surface-2: #1d2025;
-  --surface-hover: #1f2328;
-  --border: #2f3336;
-  --border-strong: #3f4449;
-  --text: #e7e9ea;
-  --text-secondary: #71767b;
-  --text-tertiary: #565c62;
+  --surface: #141619;
+  --surface-2: #1c1f23;
+  --surface-hover: #22262b;
+  --border: #2b2f34;
+  --border-strong: #41464c;
+  --text: #ffffff;
+  --text-secondary: #8b9299;
+  --text-tertiary: #6a7178;
 }
 
 * {
@@ -53,7 +54,7 @@ body {
   margin: 0;
   font-family: var(--font);
   background:
-    radial-gradient(1100px 620px at 78% -14%, rgba(29, 155, 240, 0.09), transparent 62%),
+    radial-gradient(1000px 560px at 76% -18%, rgba(255, 255, 255, 0.045), transparent 62%),
     var(--bg);
   color: var(--text);
   font-size: 15px;
@@ -64,7 +65,7 @@ body {
 
 [data-theme='black'] body {
   background:
-    radial-gradient(900px 520px at 80% -16%, rgba(29, 155, 240, 0.07), transparent 60%),
+    radial-gradient(900px 520px at 80% -16%, rgba(255, 255, 255, 0.035), transparent 60%),
     var(--bg);
 }
 
@@ -101,7 +102,7 @@ select {
 }
 
 ::selection {
-  background: rgba(29, 155, 240, 0.35);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 :focus-visible {
@@ -111,7 +112,7 @@ select {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3a444e transparent;
+  scrollbar-color: #3a3e44 transparent;
 }
 
 *::-webkit-scrollbar {
@@ -120,14 +121,14 @@ select {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #3a444e;
+  background: #3a3e44;
   border-radius: 999px;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #4c5864;
+  background: #565b61;
   background-clip: content-box;
 }
 
@@ -362,7 +363,7 @@ select {
 
 .btn--primary {
   background: var(--accent);
-  color: #ffffff;
+  color: #000000;
 }
 
 .btn--primary:hover:not(:disabled) {
@@ -376,22 +377,24 @@ select {
 
 .btn--ghost:hover:not(:disabled) {
   background: rgba(239, 243, 244, 0.08);
-  border-color: #4a5560;
+  border-color: var(--border-strong);
 }
 
 .btn--danger {
-  background: var(--danger);
-  color: #ffffff;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
 }
 
 .btn--danger:hover:not(:disabled) {
-  background: #dc1c29;
+  border-color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .btn--danger-hover:hover:not(:disabled) {
-  color: var(--danger);
-  border-color: rgba(244, 33, 46, 0.5);
-  background: var(--danger-soft);
+  color: var(--text);
+  border-color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .btn--sm {
@@ -438,7 +441,7 @@ select {
 }
 
 .link-btn--accent:hover {
-  color: #5cc0ff;
+  color: var(--accent-hover);
 }
 
 /* ───────────────────────── Чипы ───────────────────────── */
@@ -551,9 +554,9 @@ select {
   gap: 26px;
   padding: 26px 28px;
   background:
-    radial-gradient(120% 160% at 100% 0%, rgba(29, 155, 240, 0.16), transparent 55%),
-    linear-gradient(150deg, #1c2b39 0%, var(--surface) 58%);
-  border-color: #34414d;
+    radial-gradient(120% 160% at 100% 0%, rgba(255, 255, 255, 0.07), transparent 55%),
+    linear-gradient(150deg, #1d2024 0%, var(--surface) 58%);
+  border-color: var(--border-strong);
 }
 
 .hero::after {
@@ -564,7 +567,7 @@ select {
   width: 340px;
   height: 340px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(29, 155, 240, 0.2), transparent 66%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.06), transparent 66%);
   pointer-events: none;
 }
 
@@ -672,7 +675,17 @@ select {
 }
 
 .is-negative {
-  color: var(--danger) !important;
+  color: var(--text) !important;
+  text-decoration: underline dotted rgba(255, 255, 255, 0.45);
+  text-underline-offset: 3px;
+}
+
+/* У крупных чисел подчёркивание выглядит шумно — минус виден по знаку. */
+.hero__value.is-negative,
+.company-card__value.is-negative,
+.day-summary__value.is-negative,
+.stat__value.is-negative {
+  text-decoration: none;
 }
 
 .is-expense {
@@ -938,7 +951,7 @@ select {
   gap: 3px;
   padding: 9px 11px;
   border-radius: 12px;
-  background: #0b1016;
+  background: #14171b;
   border: 1px solid var(--border-strong);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
   font-size: 11.5px;
@@ -1091,7 +1104,7 @@ select {
   gap: 10px;
   padding: 48px 28px 44px;
   background:
-    radial-gradient(90% 140% at 50% -20%, rgba(29, 155, 240, 0.1), transparent 60%),
+    radial-gradient(90% 140% at 50% -20%, rgba(255, 255, 255, 0.05), transparent 60%),
     var(--surface);
 }
 
@@ -1195,8 +1208,8 @@ select {
 .company-option.is-active {
   border-color: var(--option-accent);
   background: color-mix(in srgb, var(--option-accent) 13%, var(--surface));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--option-accent) 45%, transparent),
-    0 8px 26px color-mix(in srgb, var(--option-accent) 16%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--option-accent) 35%, transparent),
+    0 8px 26px rgba(0, 0, 0, 0.35);
 }
 
 .company-option__text {
@@ -1225,7 +1238,7 @@ select {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  color: #fff;
+  color: #000;
   background: var(--option-accent);
   opacity: 0;
   transform: scale(0.7);
@@ -1258,7 +1271,7 @@ select {
 }
 
 .date-field:hover {
-  border-color: #4a5560;
+  border-color: var(--border-strong);
 }
 
 .date-field__input {
@@ -1333,16 +1346,16 @@ select {
 }
 
 .input::placeholder {
-  color: #5b6873;
+  color: var(--text-tertiary);
 }
 
 .input:hover {
-  border-color: #4a5560;
+  border-color: var(--border-strong);
 }
 
 .input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(29, 155, 240, 0.18);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.14);
   background: rgba(0, 0, 0, 0.3);
 }
 
@@ -1454,7 +1467,7 @@ select {
   flex-direction: column;
   gap: 16px;
   background:
-    radial-gradient(120% 120% at 100% 0%, rgba(29, 155, 240, 0.1), transparent 55%),
+    radial-gradient(120% 120% at 100% 0%, rgba(255, 255, 255, 0.05), transparent 55%),
     var(--surface);
   border-color: var(--border-strong);
 }
@@ -1597,7 +1610,7 @@ select {
 
 .search-field:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(29, 155, 240, 0.15);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
 }
 
 .search-field__input {
@@ -1612,7 +1625,7 @@ select {
 }
 
 .search-field__input::placeholder {
-  color: #5b6873;
+  color: var(--text-tertiary);
 }
 
 .summary-strip {
@@ -1883,13 +1896,13 @@ select {
   width: 11px;
   height: 3px;
   border-radius: 2px;
-  background: #1d9bf0;
+  background: #ffffff;
 }
 
 .theme-option__preview-line--short {
   top: 21px;
   width: 7px;
-  background: #71767b;
+  background: #8b9299;
 }
 
 .theme-option__text {
@@ -1921,12 +1934,13 @@ select {
   height: 22px;
   border-radius: 50%;
   border: 1px solid var(--border-strong);
-  color: #fff;
+  color: #000;
 }
 
 .theme-option__check.is-active {
   background: var(--accent);
   border-color: var(--accent);
+  color: #000;
 }
 
 .data-path {
@@ -1950,7 +1964,7 @@ select {
 .data-path__value {
   font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
   font-size: 12.5px;
-  color: #9fd9ff;
+  color: var(--text);
   word-break: break-all;
 }
 
@@ -2009,7 +2023,7 @@ select {
 .settings-note code {
   font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
   font-size: 11.5px;
-  color: #9fd9ff;
+  color: var(--text);
 }
 
 .settings-note--muted {
@@ -2184,7 +2198,7 @@ select {
   padding: 11px 12px 11px 13px;
   border-radius: 12px;
   border: 1px solid var(--border-strong);
-  background: #0d141b;
+  background: #16191d;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
   font-size: 13px;
   animation: toast-in 160ms cubic-bezier(0.2, 0, 0.2, 1);
@@ -2198,8 +2212,17 @@ select {
   color: var(--success);
 }
 
+.toast--error {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: #1f2226;
+}
+
 .toast--error .toast__icon {
-  color: var(--danger);
+  color: var(--text);
+}
+
+.toast--error .toast__text {
+  font-weight: 600;
 }
 
 .toast--info .toast__icon {
@@ -2263,7 +2286,7 @@ select {
   justify-content: center;
   gap: 18px;
   background:
-    radial-gradient(700px 420px at 50% 30%, rgba(29, 155, 240, 0.12), transparent 65%),
+    radial-gradient(700px 420px at 50% 30%, rgba(255, 255, 255, 0.06), transparent 65%),
     var(--bg);
 }
 
@@ -2603,13 +2626,13 @@ select {
 }
 
 .direction-toggle--in .direction-toggle__item.is-active {
-  background: rgba(0, 186, 124, 0.16);
-  color: #4bd6a8;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text);
 }
 
 .direction-toggle--out .direction-toggle__item.is-active {
-  background: var(--danger-soft);
-  color: #ff7a83;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary);
 }
 
 .adjust-form__footer {
@@ -2688,13 +2711,13 @@ select {
 }
 
 .movement__badge--in {
-  background: rgba(0, 186, 124, 0.14);
-  color: #4bd6a8;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
 }
 
 .movement__badge--out {
-  background: var(--danger-soft);
-  color: #ff7a83;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary);
 }
 
 .movement__date {
@@ -2738,11 +2761,11 @@ select {
 }
 
 .movement__amount--in {
-  color: #4bd6a8;
+  color: var(--text);
 }
 
 .movement__amount--out {
-  color: #ff7a83;
+  color: var(--text-secondary);
 }
 
 /* ── История: сетка из девяти показателей ── */
@@ -2763,7 +2786,7 @@ select {
 }
 
 .suggest-link:hover {
-  color: #5cc0ff;
+  color: var(--accent-hover);
 }
 
 /* ── Ставка комиссии в настройках ── */

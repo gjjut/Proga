@@ -21,9 +21,9 @@ import {
  *
  * Сводка:
  *   выручка   = Σ итогов дней
- *   комиссия  = Σ комиссий по дням
+ *   комиссия  = Σ комиссий по дням + комиссия с поступлений через терминал
  *   НЗ        = Σ отложено за дни ± движения по НЗ
- *   остаток   = выручка − комиссия − НЗ ± движения денег
+ *   остаток   = выручка − комиссия − НЗ + движения по наличке + движения по терминалу
  *
  * Движения по наличке, датированные позже последней записи компании, ещё не попали
  * ни в один «факт кассы», поэтому они меняют и наличные, и остаток. Движения внутри
@@ -80,6 +80,8 @@ export interface AdjustmentImpact {
   cashNet: number;
   /** Влияние движений по терминалу на остаток (за вычетом комиссии) */
   terminalNet: number;
+  /** То же без вычета комиссии — чтобы остаток сходился с показанной комиссией */
+  terminalGrossNet: number;
   /** Чистое движение по НЗ: + положили, − забрали */
   reserveNet: number;
   /** Комиссия банка, удержанная с поступлений по терминалу */
@@ -89,7 +91,7 @@ export interface AdjustmentImpact {
 export interface Totals {
   /** Выручка: сумма итогов дней */
   revenue: number;
-  /** Комиссия банка по терминалу дней */
+  /** Комиссия банка: по терминалу дней + с поступлений через терминал */
   commission: number;
   /** Расходы за период (справочно) */
   expenses: number;
@@ -111,6 +113,7 @@ export const EMPTY_IMPACT: AdjustmentImpact = {
   outTotal: 0,
   cashNet: 0,
   terminalNet: 0,
+  terminalGrossNet: 0,
   reserveNet: 0,
   commission: 0,
 };
@@ -189,6 +192,7 @@ export function totalsOf(
       const fee = adjustment.direction === 'in' ? commissionOf(adjustment.amount, commissionRate) : 0;
       impact.commission += fee;
       impact.terminalNet += adjustment.direction === 'in' ? adjustment.amount - fee : -adjustment.amount;
+      impact.terminalGrossNet += signed;
       continue;
     }
 
@@ -215,13 +219,15 @@ export function totalsOf(
   }
 
   const reserve = round2(reserveDeposits + reserveAdjustments);
+  // Комиссия в сводке — полная: и по дням, и с поступлений через терминал.
+  const commissionTotal = round2(commission + impact.commission);
   const balance = round2(
-    revenue - commission - reserve + impact.cashNet + impact.terminalNet,
+    revenue - commissionTotal - reserve + impact.cashNet + impact.terminalGrossNet,
   );
 
   return {
     revenue: round2(revenue),
-    commission: round2(commission),
+    commission: commissionTotal,
     expenses: round2(expenses),
     reserve,
     cash: round2(cash),
@@ -234,6 +240,7 @@ export function totalsOf(
       outTotal: round2(impact.outTotal),
       cashNet: round2(impact.cashNet),
       terminalNet: round2(impact.terminalNet),
+      terminalGrossNet: round2(impact.terminalGrossNet),
       reserveNet: round2(reserveAdjustments),
       commission: round2(impact.commission),
     },

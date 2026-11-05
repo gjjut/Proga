@@ -18,6 +18,9 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  TZ: Europe/Moscow
+
 jobs:
   build-windows:
     name: Сборка Windows (.exe) и публикация релиза

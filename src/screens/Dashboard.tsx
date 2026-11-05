@@ -78,17 +78,15 @@ export function Dashboard() {
     () => companyBreakdown(periodRecords, periodAdjustments, rate),
     [periodRecords, periodAdjustments, rate],
   );
-  const series = useMemo(
-    () => dailySeries(periodRecords, 14, today, rate),
-    [periodRecords, today, rate],
-  );
+  // График всегда показывает последние 14 дней, независимо от выбранного периода сводки.
+  const series = useMemo(() => dailySeries(data.records, 14, today, rate), [data.records, today, rate]);
   const recent = useMemo(() => sortByDateDesc(periodRecords).slice(0, 5), [periodRecords]);
   const recentMovements = useMemo(
     () => sortByDateDesc(periodAdjustments).slice(0, 4),
     [periodAdjustments],
   );
   const periodLabel = PERIODS.find((item) => item.id === period)?.label ?? 'Всё время';
-  const hasAnyRecords = data.records.length > 0;
+  const hasAnyData = data.records.length > 0 || data.adjustments.length > 0;
 
   const handleExport = () => {
     if (periodRecords.length === 0 && periodAdjustments.length === 0) return;
@@ -135,7 +133,7 @@ export function Dashboard() {
         </div>
       </header>
 
-      {!hasAnyRecords ? (
+      {!hasAnyData ? (
         <section className="card empty-state">
           <div className="empty-state__icon">
             <PenIcon size={26} />
@@ -186,7 +184,7 @@ export function Dashboard() {
                 label={`Комиссия ${formatPercent(rate)}`}
                 amount={totals.commission}
                 icon={<BanknoteIcon size={15} />}
-                hint="по терминалу"
+                hint="терминал и поступления"
               />
               <MoneyStat
                 label="В НЗ"
@@ -425,14 +423,14 @@ export function Dashboard() {
             <div className="summary-strip__item summary-strip__item--muted">
               <span>Движения по остатку</span>
               <strong>
-                {formatSignedMoney(totals.adjustments.cashNet + totals.adjustments.terminalNet)}
+                {formatSignedMoney(totals.adjustments.cashNet + totals.adjustments.terminalGrossNet)}
               </strong>
             </div>
           </section>
         </>
       )}
 
-      {hasAnyRecords && periodRecords.length === 0 ? (
+      {hasAnyData && periodRecords.length === 0 ? (
         <p className="screen__note">
           За период «{periodLabel}» записей нет —{' '}
           <button type="button" className="link-btn" onClick={() => setPeriod('all')}>

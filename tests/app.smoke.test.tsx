@@ -243,16 +243,27 @@ describe('Приложение целиком', () => {
     expect(container.querySelector('.screen__subtitle')?.textContent).toContain('Арт Фокус');
   });
 
-  it('переключает тему и меняет ставку комиссии в настройках', async () => {
+  it('стартует в чёрной теме и переключает на «Графит»', async () => {
+    // Чёрно-белая тема — тема по умолчанию.
+    expect(document.documentElement.dataset.theme).toBe('black');
+
     await navTo('Настройки');
 
     expect(container.textContent).toContain('Оформление');
-    expect(container.textContent).toContain('Lights out');
+    expect(container.textContent).toContain('Чёрная');
+    expect(container.textContent).toContain('Графит');
     expect(container.textContent).toContain('Комиссия банка');
     expect(container.textContent).toContain('Как считаются показатели');
 
     await act(async () => {
-      buttonByText('Lights out')?.click();
+      buttonByText('Графит')?.click();
+    });
+    await settle(80);
+    expect(document.documentElement.dataset.theme).toBe('dim');
+    expect(stored().settings?.theme).toBe('dim');
+
+    await act(async () => {
+      buttonByText('Чёрная')?.click();
     });
     await settle(80);
     expect(document.documentElement.dataset.theme).toBe('black');
@@ -271,5 +282,6 @@ describe('Приложение целиком', () => {
 
     expect(stored().settings?.commissionRate).toBe(3.5);
     expect(container.textContent).toContain('Ставка комиссии обновлена');
+    expect(stored().settings?.commissionRate).toBe(3.5);
   });
 });

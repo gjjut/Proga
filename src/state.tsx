@@ -280,6 +280,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const restored = await api.importFile();
       if (!restored) return false;
+      if (restored.records.length === 0 && restored.adjustments.length === 0 && data.records.length > 0) {
+        notify('В выбранном файле нет записей — данные не изменены', 'error');
+        return false;
+      }
       await api.replaceData(restored);
       setData(restored);
       notify(`Загружено записей: ${restored.records.length}`, 'success');
@@ -288,7 +292,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       notify(`Не удалось загрузить копию: ${errorMessage(error)}`, 'error');
       return false;
     }
-  }, [notify]);
+  }, [data.records.length, notify]);
 
   const openDataFolder = useCallback(async () => {
     try {

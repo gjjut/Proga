@@ -176,6 +176,6 @@ export function buildDemoData(todayIso: string, days = 42): AppData {
     schemaVersion: 2,
     records,
     adjustments,
-    settings: { theme: 'dim', lastCompany: 'zaton', commissionRate: 2.75 },
+    settings: { theme: 'black', lastCompany: 'zaton', commissionRate: 2.75 },
   };
 }

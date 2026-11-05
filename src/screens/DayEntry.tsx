@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   COMPANIES,
   companyById,
+  isIsoDate,
   newId,
   round2,
   type CompanyId,
@@ -193,6 +194,10 @@ export function DayEntry() {
   };
 
   const handleSave = async () => {
+    if (!isIsoDate(date)) {
+      notify('Проверьте дату: выберите день в календаре', 'error');
+      return;
+    }
     if (terminalValue <= 0 && factValue <= 0 && reserveValue <= 0 && expensesValue <= 0 && prevValue <= 0) {
       notify('Заполните хотя бы одно поле: терминал, кассу, НЗ или расходы', 'error');
       return;

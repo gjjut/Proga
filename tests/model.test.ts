@@ -3,6 +3,7 @@ import {
   DEFAULT_COMMISSION_RATE,
   SCHEMA_VERSION,
   createEmptyData,
+  isIsoDate,
   normalizeData,
   patchSettings,
   removeAdjustment,
@@ -11,12 +12,50 @@ import {
   upsertRecord,
 } from '../shared/model';
 
+describe('даты (часовые пояса)', () => {
+  it('принимает обычные и високосные даты в любом часовом поясе', () => {
+    // Регрессия: раньше дата сравнивалась с toISOString(), и в зоне UTC+N
+    // любая дата считалась некорректной («Некорректная дата» при сохранении).
+    expect(isIsoDate('2026-11-05')).toBe(true);
+    expect(isIsoDate('2026-01-01')).toBe(true);
+    expect(isIsoDate('2028-02-29')).toBe(true);
+    expect(isIsoDate('2026-12-31')).toBe(true);
+  });
+
+  it('отвергает несуществующие и неправильно записанные даты', () => {
+    expect(isIsoDate('2026-02-29')).toBe(false);
+    expect(isIsoDate('2026-13-01')).toBe(false);
+    expect(isIsoDate('2026-11-31')).toBe(false);
+    expect(isIsoDate('2026-00-10')).toBe(false);
+    expect(isIsoDate('05.11.2026')).toBe(false);
+    expect(isIsoDate('2026-11-5')).toBe(false);
+    expect(isIsoDate('')).toBe(false);
+    expect(isIsoDate(20261105)).toBe(false);
+  });
+
+  it('сохраняет запись за сегодняшнюю дату без ошибок', () => {
+    const today = new Date();
+    const iso = `${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, '0')}-${`${today.getDate()}`.padStart(2, '0')}`;
+    const data = upsertRecord(createEmptyData(), {
+      company: 'zaton',
+      date: iso,
+      cashPrev: 0,
+      terminal: 1000,
+      cashFact: 1000,
+      reserve: 0,
+      expenses: [],
+    });
+    expect(data.records).toHaveLength(1);
+    expect(data.records[0].date).toBe(iso);
+  });
+});
+
 describe('миграция и нормализация', () => {
   it('нормализует мусор в пустое состояние', () => {
     const data = normalizeData(null);
     expect(data.records).toEqual([]);
     expect(data.adjustments).toEqual([]);
-    expect(data.settings.theme).toBe('dim');
+    expect(data.settings.theme).toBe('black');
     expect(data.settings.commissionRate).toBe(DEFAULT_COMMISSION_RATE);
     expect(data.schemaVersion).toBe(SCHEMA_VERSION);
   });
@@ -224,6 +263,6 @@ describe('настройки', () => {
     data = patchSettings(data, { commissionRate: -5 });
     expect(data.settings.commissionRate).toBe(0);
     data = patchSettings(data, { theme: 'неверная' as never });
-    expect(data.settings.theme).toBe('dim');
+    expect(data.settings.theme).toBe('black');
   });
 });

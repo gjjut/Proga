@@ -101,13 +101,13 @@ export const COMPANIES: readonly Company[] = [
     id: 'zaton',
     name: 'Затон Рыбака',
     description: 'Рыболовная база',
-    accent: '#1D9BF0',
+    accent: '#FFFFFF',
   },
   {
     id: 'artfokus',
     name: 'Арт Фокус',
     description: 'Творческая студия',
-    accent: '#F91880',
+    accent: '#9AA1A8',
   },
 ] as const;
 
@@ -157,10 +157,23 @@ export function toMoney(value: unknown): number {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Проверяет дату формата YYYY-MM-DD.
+ *
+ * Важно: нельзя сравнивать с `toISOString()` — дата без времени трактуется как локальная
+ * полночь, и в любом часовом поясе восточнее UTC (Москва, Омск, Владивосток…) сдвигается
+ * на предыдущий день. Поэтому проверяем компоненты через UTC-конструктор.
+ */
 export function isIsoDate(value: unknown): value is string {
   if (typeof value !== 'string' || !DATE_RE.test(value)) return false;
-  const date = new Date(`${value}T00:00:00`);
-  return !Number.isNaN(date.getTime()) && value === date.toISOString().slice(0, 10);
+  const [year, month, day] = value.split('-').map((part) => Number.parseInt(part, 10));
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
 }
 
 function toIsoOrNow(value: unknown): string {
@@ -283,7 +296,7 @@ export function normalizeData(raw: unknown): AppData {
     records,
     adjustments,
     settings: {
-      theme: isThemeMode(settingsSource.theme) ? settingsSource.theme : 'dim',
+      theme: isThemeMode(settingsSource.theme) ? settingsSource.theme : 'black',
       lastCompany: isCompanyId(settingsSource.lastCompany) ? settingsSource.lastCompany : 'zaton',
       commissionRate,
     },
@@ -295,7 +308,7 @@ export function createEmptyData(): AppData {
     schemaVersion: SCHEMA_VERSION,
     records: [],
     adjustments: [],
-    settings: { theme: 'dim', lastCompany: 'zaton', commissionRate: DEFAULT_COMMISSION_RATE },
+    settings: { theme: 'black', lastCompany: 'zaton', commissionRate: DEFAULT_COMMISSION_RATE },
   };
 }
 

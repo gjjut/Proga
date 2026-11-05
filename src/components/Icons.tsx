@@ -258,14 +258,14 @@ export function BrandMark({ size = 32 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
       <defs>
         <linearGradient id="brand-mark-gradient" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#1D9BF0" />
-          <stop offset="100%" stopColor="#0B5C96" />
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="100%" stopColor="#7C838A" />
         </linearGradient>
       </defs>
       <rect width="32" height="32" rx="9.5" fill="url(#brand-mark-gradient)" />
       <path
         d="M9.5 22V17.2M16 22V13M22.5 22V9.6"
-        stroke="#FFFFFF"
+        stroke="#101215"
         strokeWidth="3"
         strokeLinecap="round"
       />
