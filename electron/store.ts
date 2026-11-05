@@ -1,13 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
-import type { AppData, DayRecordInput, Settings } from '../shared/model';
+import type { AdjustmentInput, AppData, DayRecordInput, Settings } from '../shared/model';
 import {
   createEmptyData,
   normalizeData,
   patchSettings,
+  removeAdjustment,
   removeRecord,
   round2,
+  upsertAdjustment,
   upsertRecord,
 } from '../shared/model';
 
@@ -93,6 +95,14 @@ export class DataStore {
     return this.persist(removeRecord(this.data, id));
   }
 
+  saveAdjustment(input: AdjustmentInput): AppData {
+    return this.persist(upsertAdjustment(this.data, input));
+  }
+
+  deleteAdjustment(id: string): AppData {
+    return this.persist(removeAdjustment(this.data, id));
+  }
+
   updateSettings(patch: Partial<Settings>): AppData {
     return this.persist(patchSettings(this.data, patch));
   }
@@ -101,8 +111,12 @@ export class DataStore {
     return this.persist(normalizeData(raw));
   }
 
-  summary(): { records: number; revenue: number } {
+  summary(): { records: number; adjustments: number; revenue: number } {
     const revenue = this.data.records.reduce((sum, record) => sum + record.terminal, 0);
-    return { records: this.data.records.length, revenue: round2(revenue) };
+    return {
+      records: this.data.records.length,
+      adjustments: this.data.adjustments.length,
+      revenue: round2(revenue),
+    };
   }
 }

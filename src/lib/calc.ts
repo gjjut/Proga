@@ -1,99 +1,287 @@
-import { COMPANIES, type CompanyId, type DayRecord } from '../../shared/model';
-import { round2 } from '../../shared/model';
+import {
+  COMPANIES,
+  DEFAULT_COMMISSION_RATE,
+  adjustmentSigned,
+  round2,
+  type Adjustment,
+  type AdjustmentTarget,
+  type CompanyId,
+  type DayRecord,
+} from '../../shared/model';
 
-export interface Totals {
-  /** Выручка: сумма по терминалу */
-  revenue: number;
-  /** Сумма всех расходов */
+/**
+ * Модель расчётов (схема v2).
+ *
+ * Запись дня:
+ *   изменение наличных = факт в кассе − остаток наличных вчера
+ *   итог дня           = терминал + изменение наличных + расходы
+ *   комиссия           = терминал × ставка банка
+ *   НЗ                 = сумма, отложенная за день
+ *   остаток дня        = итог дня − комиссия − НЗ
+ *
+ * Сводка:
+ *   выручка   = Σ итогов дней
+ *   комиссия  = Σ комиссий по дням
+ *   НЗ        = Σ отложено за дни ± движения по НЗ
+ *   остаток   = выручка − комиссия − НЗ ± движения денег
+ *
+ * Движения по наличке, датированные позже последней записи компании, ещё не попали
+ * ни в один «факт кассы», поэтому они меняют и наличные, и остаток. Движения внутри
+ * уже записанных дней уже сидят в фактическом остатке — второй раз их не считаем.
+ */
+
+export interface DayMetrics {
+  /** Изменение наличных в кассе за день */
+  cashChange: number;
+  /** Сумма расходов дня */
   expenses: number;
-  /** Отложено в неприкосновенный запас */
+  /** Итог дня: терминал + изменение наличных + расходы */
+  revenue: number;
+  /** Комиссия банка по терминалу */
+  commission: number;
+  /** Отложено в НЗ */
   reserve: number;
-  /** Свободный остаток: выручка − расходы − НЗ */
+  /** Остаток дня: итог − комиссия − НЗ */
   balance: number;
-  /** Остаток наличных в кассе по последней записи */
-  cash: number;
-  /** Количество записей (дней) */
-  records: number;
-  /** Количество строк расходов */
-  expenseCount: number;
-  lastDate: string | null;
 }
-
-export const EMPTY_TOTALS: Totals = {
-  revenue: 0,
-  expenses: 0,
-  reserve: 0,
-  balance: 0,
-  cash: 0,
-  records: 0,
-  expenseCount: 0,
-  lastDate: null,
-};
 
 export function recordExpensesTotal(record: DayRecord): number {
   return round2(record.expenses.reduce((sum, expense) => sum + expense.amount, 0));
 }
 
-/** Итоги за один день: выручка, расходы, НЗ, остаток дня */
-export function dayTotals(record: DayRecord): {
-  revenue: number;
-  expenses: number;
-  reserve: number;
-  balance: number;
-} {
+export function commissionOf(amount: number, rate: number = DEFAULT_COMMISSION_RATE): number {
+  return round2((amount * rate) / 100);
+}
+
+export function dayMetrics(
+  record: DayRecord,
+  commissionRate: number = DEFAULT_COMMISSION_RATE,
+): DayMetrics {
   const expenses = recordExpensesTotal(record);
+  const cashChange = round2(record.cashFact - record.cashPrev);
+  const revenue = round2(record.terminal + cashChange + expenses);
+  const commission = commissionOf(record.terminal, commissionRate);
   return {
-    revenue: record.terminal,
+    cashChange,
     expenses,
+    revenue,
+    commission,
     reserve: record.reserve,
-    balance: round2(record.terminal - expenses - record.reserve),
+    balance: round2(revenue - commission - record.reserve),
   };
 }
 
-function laterRecord(current: DayRecord | null, candidate: DayRecord): DayRecord {
+export interface AdjustmentImpact {
+  /** Сколько всего положили */
+  inTotal: number;
+  /** Сколько всего забрали */
+  outTotal: number;
+  /** Влияние движений по наличке на остаток (уже вне записей) */
+  cashNet: number;
+  /** Влияние движений по терминалу на остаток (за вычетом комиссии) */
+  terminalNet: number;
+  /** Чистое движение по НЗ: + положили, − забрали */
+  reserveNet: number;
+  /** Комиссия банка, удержанная с поступлений по терминалу */
+  commission: number;
+}
+
+export interface Totals {
+  /** Выручка: сумма итогов дней */
+  revenue: number;
+  /** Комиссия банка по терминалу дней */
+  commission: number;
+  /** Расходы за период (справочно) */
+  expenses: number;
+  /** Неприкосновенный запас: накоплено */
+  reserve: number;
+  /** Наличные в кассе: фактический остаток + движения после последней записи */
+  cash: number;
+  /** Свободный остаток: выручка − комиссия − НЗ ± движения */
+  balance: number;
+  records: number;
+  expenseCount: number;
+  lastDate: string | null;
+  adjustments: AdjustmentImpact;
+  commissionRate: number;
+}
+
+export const EMPTY_IMPACT: AdjustmentImpact = {
+  inTotal: 0,
+  outTotal: 0,
+  cashNet: 0,
+  terminalNet: 0,
+  reserveNet: 0,
+  commission: 0,
+};
+
+export const EMPTY_TOTALS: Totals = {
+  revenue: 0,
+  commission: 0,
+  expenses: 0,
+  reserve: 0,
+  cash: 0,
+  balance: 0,
+  records: 0,
+  expenseCount: 0,
+  lastDate: null,
+  adjustments: { ...EMPTY_IMPACT },
+  commissionRate: DEFAULT_COMMISSION_RATE,
+};
+
+function laterRecord(current: DayRecord | undefined, candidate: DayRecord): DayRecord {
   if (!current) return candidate;
   if (candidate.date > current.date) return candidate;
   if (candidate.date < current.date) return current;
   return candidate.updatedAt >= current.updatedAt ? candidate : current;
 }
 
-export function totalsOf(records: DayRecord[]): Totals {
-  if (records.length === 0) return { ...EMPTY_TOTALS };
-
-  let revenue = 0;
-  let expenses = 0;
-  let reserve = 0;
-  let expenseCount = 0;
-  let latest: DayRecord | null = null;
-  const latestByCompany = new Map<CompanyId, DayRecord>();
-
+export function lastRecordByCompany(records: DayRecord[]): Map<CompanyId, DayRecord> {
+  const map = new Map<CompanyId, DayRecord>();
   for (const record of records) {
-    revenue += record.terminal;
-    reserve += record.reserve;
-    expenses += recordExpensesTotal(record);
-    expenseCount += record.expenses.length;
-    latest = laterRecord(latest, record);
-    latestByCompany.set(record.company, laterRecord(latestByCompany.get(record.company) ?? null, record));
+    map.set(record.company, laterRecord(map.get(record.company), record));
+  }
+  return map;
+}
+
+export function totalsOf(
+  records: DayRecord[],
+  adjustments: Adjustment[] = [],
+  commissionRate: number = DEFAULT_COMMISSION_RATE,
+): Totals {
+  if (records.length === 0 && adjustments.length === 0) {
+    return { ...EMPTY_TOTALS, commissionRate };
   }
 
-  const cash = round2(
-    [...latestByCompany.values()].reduce((sum, current) => sum + current.cash, 0),
+  let revenue = 0;
+  let commission = 0;
+  let expenses = 0;
+  let expenseCount = 0;
+  let reserveDeposits = 0;
+  let lastDate: string | null = null;
+
+  for (const record of records) {
+    const metrics = dayMetrics(record, commissionRate);
+    revenue += metrics.revenue;
+    commission += metrics.commission;
+    expenses += metrics.expenses;
+    expenseCount += record.expenses.length;
+    reserveDeposits += record.reserve;
+    if (!lastDate || record.date > lastDate) lastDate = record.date;
+  }
+
+  const lastByCompany = lastRecordByCompany(records);
+
+  const impact: AdjustmentImpact = { ...EMPTY_IMPACT };
+  let reserveAdjustments = 0;
+
+  for (const adjustment of adjustments) {
+    const signed = adjustmentSigned(adjustment);
+    if (adjustment.direction === 'in') impact.inTotal += adjustment.amount;
+    else impact.outTotal += adjustment.amount;
+
+    if (adjustment.target === 'reserve') {
+      reserveAdjustments += signed;
+      continue;
+    }
+
+    if (adjustment.target === 'terminal') {
+      const fee = adjustment.direction === 'in' ? commissionOf(adjustment.amount, commissionRate) : 0;
+      impact.commission += fee;
+      impact.terminalNet += adjustment.direction === 'in' ? adjustment.amount - fee : -adjustment.amount;
+      continue;
+    }
+
+    // Наличка: учитываем только то, что ещё не попало в фактический остаток записей.
+    const lastRecord = lastByCompany.get(adjustment.company);
+    if (!lastRecord || adjustment.date > lastRecord.date) {
+      impact.cashNet += signed;
+    }
+  }
+
+  let cash = 0;
+  for (const company of COMPANIES) {
+    const lastRecord = lastByCompany.get(company.id);
+    const base = lastRecord ? lastRecord.cashFact : 0;
+    const after = adjustments
+      .filter(
+        (adjustment) =>
+          adjustment.company === company.id &&
+          adjustment.target === 'cash' &&
+          (!lastRecord || adjustment.date > lastRecord.date),
+      )
+      .reduce((sum, adjustment) => sum + adjustmentSigned(adjustment), 0);
+    cash += base + after;
+  }
+
+  const reserve = round2(reserveDeposits + reserveAdjustments);
+  const balance = round2(
+    revenue - commission - reserve + impact.cashNet + impact.terminalNet,
   );
 
   return {
     revenue: round2(revenue),
+    commission: round2(commission),
     expenses: round2(expenses),
-    reserve: round2(reserve),
-    balance: round2(revenue - expenses - reserve),
-    cash,
+    reserve,
+    cash: round2(cash),
+    balance,
     records: records.length,
     expenseCount,
-    lastDate: latest ? latest.date : null,
+    lastDate,
+    adjustments: {
+      inTotal: round2(impact.inTotal),
+      outTotal: round2(impact.outTotal),
+      cashNet: round2(impact.cashNet),
+      terminalNet: round2(impact.terminalNet),
+      reserveNet: round2(reserveAdjustments),
+      commission: round2(impact.commission),
+    },
+    commissionRate,
   };
 }
 
-export function companyTotals(records: DayRecord[], company: CompanyId): Totals {
-  return totalsOf(records.filter((record) => record.company === company));
+export function companyTotals(
+  records: DayRecord[],
+  adjustments: Adjustment[],
+  company: CompanyId,
+  commissionRate: number = DEFAULT_COMMISSION_RATE,
+): Totals {
+  return totalsOf(
+    records.filter((record) => record.company === company),
+    adjustments.filter((adjustment) => adjustment.company === company),
+    commissionRate,
+  );
+}
+
+/**
+ * Рекомендуемый «остаток наличных вчера»: фактический остаток кассы последней записи
+ * компании плюс движения по наличке, случившиеся между ней и выбранной датой.
+ */
+export function suggestedCashPrev(
+  records: DayRecord[],
+  adjustments: Adjustment[],
+  company: CompanyId,
+  date: string,
+): number {
+  const earlier = records
+    .filter((record) => record.company === company && record.date < date)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.updatedAt.localeCompare(b.updatedAt));
+  const last = earlier[earlier.length - 1] ?? null;
+  const base = last ? last.cashFact : 0;
+  const baseDate = last ? last.date : '0000-01-01';
+
+  const movements = adjustments
+    .filter(
+      (adjustment) =>
+        adjustment.company === company &&
+        adjustment.target === 'cash' &&
+        adjustment.date > baseDate &&
+        adjustment.date < date,
+    )
+    .reduce((sum, adjustment) => sum + adjustmentSigned(adjustment), 0);
+
+  return round2(base + movements);
 }
 
 export interface RecordFilter {
@@ -112,10 +300,7 @@ export function filterRecords(records: DayRecord[], filter: RecordFilter = {}): 
     if (from && record.date < from) return false;
     if (to && record.date > to) return false;
     if (needle) {
-      const haystack = [
-        record.note,
-        ...record.expenses.map((expense) => expense.comment),
-      ]
+      const haystack = [record.note, ...record.expenses.map((expense) => expense.comment)]
         .join(' ')
         .toLowerCase();
       if (!haystack.includes(needle)) return false;
@@ -124,16 +309,26 @@ export function filterRecords(records: DayRecord[], filter: RecordFilter = {}): 
   });
 }
 
-export function sortByDateDesc(records: DayRecord[]): DayRecord[] {
-  return [...records].sort(
-    (a, b) => b.date.localeCompare(a.date) || a.company.localeCompare(b.company),
-  );
+export function filterAdjustments(
+  adjustments: Adjustment[],
+  filter: Omit<RecordFilter, 'query'> & { target?: AdjustmentTarget | 'all' } = {},
+): Adjustment[] {
+  const { company = 'all', from, to, target = 'all' } = filter;
+  return adjustments.filter((adjustment) => {
+    if (company !== 'all' && adjustment.company !== company) return false;
+    if (target !== 'all' && adjustment.target !== target) return false;
+    if (from && adjustment.date < from) return false;
+    if (to && adjustment.date > to) return false;
+    return true;
+  });
 }
 
-export function sortByDateAsc(records: DayRecord[]): DayRecord[] {
-  return [...records].sort(
-    (a, b) => a.date.localeCompare(b.date) || a.company.localeCompare(b.company),
-  );
+export function sortByDateDesc<T extends { date: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export function sortByDateAsc<T extends { date: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export interface SeriesPoint {
@@ -142,22 +337,19 @@ export interface SeriesPoint {
   byCompany: Record<CompanyId, number>;
 }
 
-/** Ряды по дням за последние `days` дней (включая сегодня) */
+/** Ряды по дням за последние `days` дней (включая сегодня): выручка = итог дня. */
 export function dailySeries(
   records: DayRecord[],
   days: number,
   today: string,
+  commissionRate: number = DEFAULT_COMMISSION_RATE,
 ): SeriesPoint[] {
   const points: SeriesPoint[] = [];
   const index = new Map<string, SeriesPoint>();
 
   for (let offset = days - 1; offset >= 0; offset -= 1) {
     const date = shiftDate(today, -offset);
-    const point: SeriesPoint = {
-      date,
-      total: 0,
-      byCompany: { zaton: 0, artfokus: 0 },
-    };
+    const point: SeriesPoint = { date, total: 0, byCompany: { zaton: 0, artfokus: 0 } };
     points.push(point);
     index.set(date, point);
   }
@@ -165,8 +357,9 @@ export function dailySeries(
   for (const record of records) {
     const point = index.get(record.date);
     if (!point) continue;
-    point.total = round2(point.total + record.terminal);
-    point.byCompany[record.company] = round2(point.byCompany[record.company] + record.terminal);
+    const revenue = dayMetrics(record, commissionRate).revenue;
+    point.total = round2(point.total + revenue);
+    point.byCompany[record.company] = round2(point.byCompany[record.company] + revenue);
   }
 
   return points;
@@ -181,17 +374,13 @@ function shiftDate(isoDate: string, delta: number): string {
   return `${year}-${month}-${day}`;
 }
 
-/** Доступные компании с их агрегатами — для главного экрана */
-export function companyBreakdown(records: DayRecord[]): {
-  company: (typeof COMPANIES)[number];
-  totals: Totals;
-}[] {
+export function companyBreakdown(
+  records: DayRecord[],
+  adjustments: Adjustment[],
+  commissionRate: number = DEFAULT_COMMISSION_RATE,
+): { company: (typeof COMPANIES)[number]; totals: Totals }[] {
   return COMPANIES.map((company) => ({
     company,
-    totals: companyTotals(records, company.id),
+    totals: companyTotals(records, adjustments, company.id, commissionRate),
   }));
-}
-
-export function maxTerminal(records: DayRecord[]): number {
-  return records.reduce((max, record) => Math.max(max, record.terminal), 0);
 }

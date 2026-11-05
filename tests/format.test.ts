@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   formatMoney,
+  formatPercent,
+  formatSignedMoney,
   formatNumber,
   lastNDaysRange,
   monthRange,
@@ -70,5 +72,19 @@ describe('даты', () => {
 
   it('считает диапазон последних N дней включительно', () => {
     expect(lastNDaysRange(30, '2025-11-05')).toEqual({ from: '2025-10-07', to: '2025-11-05' });
+  });
+});
+
+describe('formatPercent и formatSignedMoney', () => {
+  it('печатает процент без лишних нулей', () => {
+    expect(formatPercent(2.75)).toBe('2,75%');
+    expect(formatPercent(3)).toBe('3%');
+    expect(formatPercent(0)).toBe('0%');
+  });
+
+  it('ставит знак только у ненулевых значений', () => {
+    expect(formatSignedMoney(1500)).toBe('+1\u00A0500\u00A0₽');
+    expect(formatSignedMoney(-1500)).toBe('−1\u00A0500\u00A0₽');
+    expect(formatSignedMoney(0)).toBe('0\u00A0₽');
   });
 });

@@ -3,12 +3,15 @@ import {
   createEmptyData,
   normalizeData,
   patchSettings,
+  removeAdjustment,
   removeRecord,
+  upsertAdjustment,
   upsertRecord,
+  type AdjustmentInput,
   type AppData,
   type DayRecordInput,
   type Settings,
- } from '../../shared/model';
+} from '../../shared/model';
 import { buildDemoData } from './demo';
 import { todayIso } from './format';
 
@@ -94,6 +97,12 @@ const browserApi: FinanceApi = {
   },
   async deleteRecord(id: string) {
     return writeStorage(removeRecord(readStorage(), id));
+  },
+  async saveAdjustment(input: AdjustmentInput) {
+    return writeStorage(upsertAdjustment(readStorage(), input));
+  },
+  async deleteAdjustment(id: string) {
+    return writeStorage(removeAdjustment(readStorage(), id));
   },
   async updateSettings(patch: Partial<Settings>) {
     return writeStorage(patchSettings(readStorage(), patch));

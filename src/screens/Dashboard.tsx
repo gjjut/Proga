@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react';
 import { companyById, COMPANIES } from '../../shared/model';
 import { RevenueChart } from '../components/Chart';
 import {
+  ArrowUpRightIcon,
   BanknoteIcon,
   ChevronRightIcon,
   CompanyMark,
   DownloadIcon,
   PenIcon,
+  RepeatIcon,
   ShieldIcon,
   TrendUpIcon,
   WalletIcon,
@@ -16,16 +18,19 @@ import { CompanyBadge } from '../components/Badge';
 import {
   companyBreakdown,
   dailySeries,
+  dayMetrics,
+  filterAdjustments,
   filterRecords,
-  recordExpensesTotal,
   sortByDateDesc,
   totalsOf,
 } from '../lib/calc';
 import {
+  formatDateShort,
   formatDateWithWeekday,
   formatMoney,
   formatNumber,
-  formatDateShort,
+  formatPercent,
+  formatSignedMoney,
   lastNDaysRange,
   monthRange,
   recordsLabel,
@@ -53,23 +58,41 @@ export function Dashboard() {
   const { data, navigate, exportCsv } = useApp();
   const [period, setPeriod] = useState<PeriodId>('month');
   const today = todayIso();
+  const rate = data.settings.commissionRate;
 
   const range = useMemo(() => resolveRange(period), [period]);
   const periodRecords = useMemo(
     () => (period === 'all' ? data.records : filterRecords(data.records, range)),
     [data.records, period, range],
   );
+  const periodAdjustments = useMemo(
+    () => (period === 'all' ? data.adjustments : filterAdjustments(data.adjustments, range)),
+    [data.adjustments, period, range],
+  );
 
-  const totals = useMemo(() => totalsOf(periodRecords), [periodRecords]);
-  const breakdown = useMemo(() => companyBreakdown(periodRecords), [periodRecords]);
-  const series = useMemo(() => dailySeries(periodRecords, 14, today), [periodRecords, today]);
+  const totals = useMemo(
+    () => totalsOf(periodRecords, periodAdjustments, rate),
+    [periodRecords, periodAdjustments, rate],
+  );
+  const breakdown = useMemo(
+    () => companyBreakdown(periodRecords, periodAdjustments, rate),
+    [periodRecords, periodAdjustments, rate],
+  );
+  const series = useMemo(
+    () => dailySeries(periodRecords, 14, today, rate),
+    [periodRecords, today, rate],
+  );
   const recent = useMemo(() => sortByDateDesc(periodRecords).slice(0, 5), [periodRecords]);
+  const recentMovements = useMemo(
+    () => sortByDateDesc(periodAdjustments).slice(0, 4),
+    [periodAdjustments],
+  );
   const periodLabel = PERIODS.find((item) => item.id === period)?.label ?? 'Всё время';
   const hasAnyRecords = data.records.length > 0;
 
   const handleExport = () => {
-    if (periodRecords.length === 0) return;
-    void exportCsv(periodRecords, {
+    if (periodRecords.length === 0 && periodAdjustments.length === 0) return;
+    void exportCsv(periodRecords, periodAdjustments, {
       from: range.from,
       to: range.to,
       scopeLabel: `${periodLabel} · все компании`,
@@ -82,7 +105,8 @@ export function Dashboard() {
         <div className="screen__title-wrap">
           <h1 className="screen__title">Главное</h1>
           <p className="screen__subtitle">
-            {formatDateWithWeekday(today)} · {recordsLabel(periodRecords.length)}
+            {formatDateWithWeekday(today)} · {recordsLabel(periodRecords.length)} · комиссия{' '}
+            {formatPercent(rate)}
           </p>
         </div>
         <div className="screen__actions">
@@ -103,7 +127,7 @@ export function Dashboard() {
             type="button"
             className="btn btn--ghost"
             onClick={handleExport}
-            disabled={periodRecords.length === 0}
+            disabled={periodRecords.length === 0 && periodAdjustments.length === 0}
           >
             <DownloadIcon size={17} />
             <span>Экспорт</span>
@@ -118,8 +142,8 @@ export function Dashboard() {
           </div>
           <h2 className="empty-state__title">Записей пока нет</h2>
           <p className="empty-state__text">
-            Начните с первого дня: укажите сумму по терминалу, наличные в кассе, отложенное в НЗ
-            и расходы. Сводка появится сразу после сохранения.
+            Начните с первого дня: укажите остаток наличных вчера, сумму по терминалу, фактическое
+            наличие в кассе, расходы и сумму в НЗ. Сводка появится сразу после сохранения.
           </p>
           <button type="button" className="btn btn--primary" onClick={() => navigate('day')}>
             <PenIcon size={18} />
@@ -130,13 +154,13 @@ export function Dashboard() {
         <>
           <section className="hero card">
             <div className="hero__main">
-              <div className="hero__eyebrow">Итого по двум компаниям · {periodLabel}</div>
+              <div className="hero__eyebrow">Остаток по двум компаниям · {periodLabel}</div>
               <div className={`hero__value${totals.balance < 0 ? ' is-negative' : ''}`}>
                 {formatNumber(totals.balance)}
                 <span className="hero__unit">₽</span>
               </div>
               <div className="hero__caption">
-                Свободный остаток: выручка − расходы − НЗ
+                Выручка − комиссия банка {formatPercent(rate)} − НЗ ± движения денег
               </div>
               <div className="hero__meta">
                 {totals.records > 0 && totals.lastDate ? (
@@ -144,6 +168,12 @@ export function Dashboard() {
                     <span>Последняя запись {formatDateShort(totals.lastDate)}</span>
                     <span className="dot-sep" />
                     <span>{recordsLabel(totals.records)}</span>
+                    {totals.adjustments.inTotal + totals.adjustments.outTotal > 0 ? (
+                      <>
+                        <span className="dot-sep" />
+                        <span>{data.adjustments.length} движ.</span>
+                      </>
+                    ) : null}
                   </>
                 ) : (
                   <span>Нет записей за выбранный период</span>
@@ -152,18 +182,23 @@ export function Dashboard() {
             </div>
             <div className="hero__stats">
               <MoneyStat label="Выручка" amount={totals.revenue} icon={<TrendUpIcon size={15} />} />
-              <MoneyStat label="Расходы" amount={totals.expenses} icon={<BanknoteIcon size={15} />} />
+              <MoneyStat
+                label={`Комиссия ${formatPercent(rate)}`}
+                amount={totals.commission}
+                icon={<BanknoteIcon size={15} />}
+                hint="по терминалу"
+              />
               <MoneyStat
                 label="В НЗ"
                 amount={totals.reserve}
                 icon={<ShieldIcon size={15} />}
-                accent="#1D9BF0"
+                hint="неприкосновенный запас"
               />
               <MoneyStat
                 label="Наличные в кассе"
                 amount={totals.cash}
                 icon={<WalletIcon size={15} />}
-                hint="по последней записи"
+                hint="факт + движения"
               />
             </div>
           </section>
@@ -177,11 +212,7 @@ export function Dashboard() {
               >
                 <span className="company-card__ribbon" />
                 <div className="company-card__head">
-                  <CompanyMark
-                    letter={company.name.slice(0, 1)}
-                    accent={company.accent}
-                    size={40}
-                  />
+                  <CompanyMark letter={company.name.slice(0, 1)} accent={company.accent} size={40} />
                   <div className="company-card__titles">
                     <h2 className="company-card__name">{company.name}</h2>
                     <p className="company-card__meta">{company.description}</p>
@@ -190,26 +221,28 @@ export function Dashboard() {
                 </div>
 
                 <div className="company-card__main">
-                  <div className="company-card__label">Выручка</div>
-                  <div className="company-card__value">{formatMoney(companyStats.revenue)}</div>
+                  <div className="company-card__label">Остаток после комиссии и НЗ</div>
+                  <div
+                    className={`company-card__value${companyStats.balance < 0 ? ' is-negative' : ''}`}
+                  >
+                    {formatMoney(companyStats.balance)}
+                  </div>
                 </div>
 
                 <div className="company-card__grid">
                   <div className="mini-metric">
-                    <span className="mini-metric__label">Расходы</span>
-                    <span className="mini-metric__value">{formatMoney(companyStats.expenses)}</span>
+                    <span className="mini-metric__label">Выручка</span>
+                    <span className="mini-metric__value">{formatMoney(companyStats.revenue)}</span>
+                  </div>
+                  <div className="mini-metric">
+                    <span className="mini-metric__label">Комиссия</span>
+                    <span className="mini-metric__value">
+                      {formatMoney(companyStats.commission)}
+                    </span>
                   </div>
                   <div className="mini-metric">
                     <span className="mini-metric__label">НЗ</span>
                     <span className="mini-metric__value">{formatMoney(companyStats.reserve)}</span>
-                  </div>
-                  <div className="mini-metric">
-                    <span className="mini-metric__label">Остаток</span>
-                    <span
-                      className={`mini-metric__value${companyStats.balance < 0 ? ' is-negative' : ''}`}
-                    >
-                      {formatMoney(companyStats.balance)}
-                    </span>
                   </div>
                   <div className="mini-metric">
                     <span className="mini-metric__label">В кассе</span>
@@ -218,11 +251,7 @@ export function Dashboard() {
                 </div>
 
                 <div className="company-card__footer">
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => navigate('history', null)}
-                  >
+                  <button type="button" className="link-btn" onClick={() => navigate('history')}>
                     История компании
                     <ChevronRightIcon size={15} />
                   </button>
@@ -243,7 +272,7 @@ export function Dashboard() {
             <div className="card__header">
               <div>
                 <h2 className="card__title">Динамика выручки</h2>
-                <p className="card__hint">Последние 14 дней · сумма по терминалу</p>
+                <p className="card__hint">Последние 14 дней · итог дня по записям</p>
               </div>
               <div className="card__total">
                 <span>за 14 дней</span>
@@ -253,61 +282,152 @@ export function Dashboard() {
             <RevenueChart points={series} />
           </section>
 
-          <section className="card">
-            <div className="card__header">
-              <div>
-                <h2 className="card__title">Последние записи</h2>
-                <p className="card__hint">{periodLabel}</p>
+          <div className="dashboard-columns">
+            <section className="card">
+              <div className="card__header">
+                <div>
+                  <h2 className="card__title">Последние записи</h2>
+                  <p className="card__hint">{periodLabel}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => navigate('history')}
+                >
+                  <span>Вся история</span>
+                  <ChevronRightIcon size={16} />
+                </button>
               </div>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => navigate('history')}>
-                <span>Вся история</span>
-                <ChevronRightIcon size={16} />
-              </button>
-            </div>
 
-            {recent.length === 0 ? (
-              <p className="card__empty">За выбранный период записей нет.</p>
-            ) : (
-              <ul className="recent">
-                {recent.map((record) => {
-                  const meta = companyById(record.company);
-                  const expenses = recordExpensesTotal(record);
-                  return (
-                    <li key={record.id}>
+              {recent.length === 0 ? (
+                <p className="card__empty">За выбранный период записей нет.</p>
+              ) : (
+                <ul className="recent">
+                  {recent.map((record) => {
+                    const metrics = dayMetrics(record, rate);
+                    return (
+                      <li key={record.id}>
+                        <button
+                          type="button"
+                          className="recent__row"
+                          onClick={() =>
+                            navigate('day', { company: record.company, date: record.date })
+                          }
+                        >
+                          <span className="recent__date">
+                            <strong>{formatDateShort(record.date)}</strong>
+                            <span>
+                              {formatDateWithWeekday(record.date).split(',').slice(-1)[0].trim()}
+                            </span>
+                          </span>
+                          <CompanyBadge company={record.company} />
+                          <span className="recent__amounts">
+                            <span className="recent__amount">{formatMoney(metrics.revenue)}</span>
+                            <span className="recent__sub">
+                              терминал {formatMoney(record.terminal)} · комиссия{' '}
+                              {formatMoney(metrics.commission)}
+                            </span>
+                          </span>
+                          <span
+                            className={`recent__balance${
+                              metrics.balance < 0 ? ' is-negative' : ''
+                            }`}
+                          >
+                            {formatMoney(metrics.balance)}
+                          </span>
+                          <span className="recent__chevron" style={{ color: companyById(record.company).accent }}>
+                            <ChevronRightIcon size={16} />
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <section className="card">
+              <div className="card__header">
+                <div>
+                  <h2 className="card__title">Движения денег</h2>
+                  <p className="card__hint">Поступления и изъятия · {periodLabel}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => navigate('adjustments')}
+                >
+                  <RepeatIcon size={16} />
+                  <span>Открыть</span>
+                </button>
+              </div>
+
+              {recentMovements.length === 0 ? (
+                <p className="card__empty">
+                  Пока пусто. Здесь можно положить или забрать деньги из кассы, терминала или НЗ,
+                  не меняя итоги дня.
+                </p>
+              ) : (
+                <ul className="recent">
+                  {recentMovements.map((item) => (
+                    <li key={item.id}>
                       <button
                         type="button"
                         className="recent__row"
-                        onClick={() =>
-                          navigate('day', { company: record.company, date: record.date })
-                        }
+                        onClick={() => navigate('adjustments')}
                       >
                         <span className="recent__date">
-                          <strong>{formatDateShort(record.date)}</strong>
-                          <span>{formatDateWithWeekday(record.date).split(',').slice(-1)[0].trim()}</span>
-                        </span>
-                        <CompanyBadge company={record.company} />
-                        <span className="recent__amounts">
-                          <span className="recent__amount">{formatMoney(record.terminal)}</span>
-                          <span className="recent__sub">
-                            расходы {formatMoney(expenses)} · НЗ {formatMoney(record.reserve)}
+                          <strong>{formatDateShort(item.date)}</strong>
+                          <span>
+                            {item.target === 'cash'
+                              ? 'наличные'
+                              : item.target === 'terminal'
+                                ? 'терминал'
+                                : 'НЗ'}
                           </span>
                         </span>
-                        <span
-                          className={`recent__balance${
-                            record.terminal - expenses - record.reserve < 0 ? ' is-negative' : ''
-                          }`}
-                        >
-                          {formatMoney(record.terminal - expenses - record.reserve)}
+                        <CompanyBadge company={item.company} />
+                        <span className="recent__amounts">
+                          <span className="recent__amount">
+                            {item.direction === 'in' ? '+' : '−'}
+                            {formatMoney(item.amount)}
+                          </span>
+                          <span className="recent__sub">{item.comment || '—'}</span>
                         </span>
-                        <span className="recent__chevron" style={{ color: meta.accent }}>
-                          <ChevronRightIcon size={16} />
+                        <span className="recent__chevron" style={{ color: 'var(--text-tertiary)' }}>
+                          <ArrowUpRightIcon size={15} />
                         </span>
                       </button>
                     </li>
-                  );
-                })}
-              </ul>
-            )}
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+
+          <section className="summary-strip">
+            <div className="summary-strip__item">
+              <span>Расходы за период</span>
+              <strong>{formatMoney(totals.expenses)}</strong>
+            </div>
+            <div className="summary-strip__item">
+              <span>Строк расходов</span>
+              <strong>{totals.expenseCount}</strong>
+            </div>
+            <div className="summary-strip__item">
+              <span>Положили</span>
+              <strong className="is-positive">{formatMoney(totals.adjustments.inTotal)}</strong>
+            </div>
+            <div className="summary-strip__item">
+              <span>Забрали</span>
+              <strong className="is-negative">{formatMoney(totals.adjustments.outTotal)}</strong>
+            </div>
+            <div className="summary-strip__item summary-strip__item--muted">
+              <span>Движения по остатку</span>
+              <strong>
+                {formatSignedMoney(totals.adjustments.cashNet + totals.adjustments.terminalNet)}
+              </strong>
+            </div>
           </section>
         </>
       )}

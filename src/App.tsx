@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { BrandMark } from './components/Icons';
 import { Sidebar } from './components/Sidebar';
 import { Toasts } from './components/Toasts';
+import { Adjustments } from './screens/Adjustments';
 import { Dashboard } from './screens/Dashboard';
 import { DayEntry } from './screens/DayEntry';
 import { History } from './screens/History';
@@ -19,6 +20,8 @@ export default function App() {
             key={`${dayTarget?.company ?? 'any'}-${dayTarget?.date ?? 'today'}`}
           />
         );
+      case 'adjustments':
+        return <Adjustments />;
       case 'history':
         return <History />;
       case 'settings':

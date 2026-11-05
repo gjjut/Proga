@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
-import type { DayRecordInput, ExportPayload, IpcResult } from '../shared/api';
+import type { AdjustmentInput, DayRecordInput, ExportPayload, IpcResult } from '../shared/api';
 import type { Settings } from '../shared/model';
 import { normalizeData } from '../shared/model';
 import { DataStore } from './store';
@@ -47,6 +47,8 @@ function registerIpc(): void {
   handle('data:load', () => getStore().load());
   handle('data:save-record', (input: DayRecordInput) => getStore().saveRecord(input));
   handle('data:delete-record', (id: string) => getStore().deleteRecord(id));
+  handle('data:save-adjustment', (input: AdjustmentInput) => getStore().saveAdjustment(input));
+  handle('data:delete-adjustment', (id: string) => getStore().deleteAdjustment(id));
   handle('data:update-settings', (patch: Partial<Settings>) => getStore().updateSettings(patch));
   handle('data:replace', (raw: unknown) => getStore().replaceData(raw));
 

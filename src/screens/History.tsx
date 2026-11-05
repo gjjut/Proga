@@ -9,11 +9,20 @@ import {
   TrashIcon,
 } from '../components/Icons';
 import { ConfirmDialog } from '../components/Modal';
-import { filterRecords, recordExpensesTotal, sortByDateDesc, totalsOf } from '../lib/calc';
+import {
+  dayMetrics,
+  filterAdjustments,
+  filterRecords,
+  sortByDateDesc,
+  totalsOf,
+} from '../lib/calc';
 import {
   formatDateLong,
   formatDateWithWeekday,
   formatMoney,
+  formatNumber,
+  formatPercent,
+  formatSignedMoney,
   formatTime,
   lastNDaysRange,
   monthRange,
@@ -32,6 +41,8 @@ const PRESETS: { id: PresetId; label: string }[] = [
 
 export function History() {
   const { data, navigate, deleteRecord, exportCsv } = useApp();
+  const rate = data.settings.commissionRate;
+
   const [company, setCompany] = useState<CompanyId | 'all'>('all');
   const [preset, setPreset] = useState<PresetId>('month');
   const [from, setFrom] = useState(() => monthRange(0).from);
@@ -69,7 +80,20 @@ export function History() {
     [data.records, company, from, to, query],
   );
 
-  const totals = useMemo(() => totalsOf(filtered), [filtered]);
+  const filteredAdjustments = useMemo(
+    () =>
+      filterAdjustments(data.adjustments, {
+        company,
+        from: from || undefined,
+        to: to || undefined,
+      }),
+    [data.adjustments, company, from, to],
+  );
+
+  const totals = useMemo(
+    () => totalsOf(filtered, filteredAdjustments, rate),
+    [filtered, filteredAdjustments, rate],
+  );
   const deleteTarget = filtered.find((record) => record.id === deleteId) ?? null;
 
   const toggleExpanded = (id: string) => {
@@ -83,10 +107,9 @@ export function History() {
   };
 
   const handleExport = () => {
-    if (filtered.length === 0) return;
-    const scopeLabel =
-      company === 'all' ? 'Все компании' : `Только ${companyById(company).name}`;
-    void exportCsv(filtered, {
+    if (filtered.length === 0 && filteredAdjustments.length === 0) return;
+    const scopeLabel = company === 'all' ? 'Все компании' : `Только ${companyById(company).name}`;
+    void exportCsv(filtered, filteredAdjustments, {
       from: from || undefined,
       to: to || undefined,
       scopeLabel,
@@ -99,7 +122,9 @@ export function History() {
         <div className="screen__title-wrap">
           <h1 className="screen__title">История</h1>
           <p className="screen__subtitle">
-            {recordsLabel(filtered.length)} · {company === 'all' ? 'обе компании' : companyById(company).name}
+            {recordsLabel(filtered.length)} ·{' '}
+            {company === 'all' ? 'обе компании' : companyById(company).name} · комиссия{' '}
+            {formatPercent(rate)}
           </p>
         </div>
         <div className="screen__actions">
@@ -107,7 +132,7 @@ export function History() {
             type="button"
             className="btn btn--primary"
             onClick={handleExport}
-            disabled={filtered.length === 0}
+            disabled={filtered.length === 0 && filteredAdjustments.length === 0}
           >
             <DownloadIcon size={17} />
             <span>Экспорт в Excel (CSV)</span>
@@ -211,6 +236,10 @@ export function History() {
           <strong>{formatMoney(totals.revenue)}</strong>
         </div>
         <div className="summary-strip__item">
+          <span>Комиссия</span>
+          <strong>{formatMoney(totals.commission)}</strong>
+        </div>
+        <div className="summary-strip__item">
           <span>Расходы</span>
           <strong>{formatMoney(totals.expenses)}</strong>
         </div>
@@ -219,14 +248,14 @@ export function History() {
           <strong>{formatMoney(totals.reserve)}</strong>
         </div>
         <div className="summary-strip__item">
+          <span>Наличные в кассе</span>
+          <strong>{formatMoney(totals.cash)}</strong>
+        </div>
+        <div className="summary-strip__item">
           <span>Остаток</span>
           <strong className={totals.balance < 0 ? 'is-negative' : ''}>
             {formatMoney(totals.balance)}
           </strong>
-        </div>
-        <div className="summary-strip__item summary-strip__item--muted">
-          <span>Записей</span>
-          <strong>{totals.records}</strong>
         </div>
       </section>
 
@@ -247,9 +276,8 @@ export function History() {
       ) : (
         <div className="record-list">
           {filtered.map((record) => {
+            const metrics = dayMetrics(record, rate);
             const meta = companyById(record.company);
-            const expenses = recordExpensesTotal(record);
-            const balance = record.terminal - expenses - record.reserve;
             const isOpen = expanded.includes(record.id);
             return (
               <article key={record.id} className="record card">
@@ -274,27 +302,48 @@ export function History() {
                   </div>
                 </div>
 
-                <div className="record__stats">
+                <div className="record__stats record__stats--grid3">
+                  <div className="record__stat">
+                    <span>Остаток вчера</span>
+                    <strong>{formatMoney(record.cashPrev)}</strong>
+                  </div>
                   <div className="record__stat">
                     <span>Терминал</span>
                     <strong>{formatMoney(record.terminal)}</strong>
                   </div>
                   <div className="record__stat">
+                    <span>Факт в кассе</span>
+                    <strong>{formatMoney(record.cashFact)}</strong>
+                  </div>
+                  <div className="record__stat">
+                    <span>Изменение наличных</span>
+                    <strong className={metrics.cashChange < 0 ? 'is-negative' : 'is-positive'}>
+                      {formatSignedMoney(metrics.cashChange)}
+                    </strong>
+                  </div>
+                  <div className="record__stat">
                     <span>Расходы</span>
-                    <strong className="is-expense">−{formatMoney(expenses)}</strong>
+                    <strong>{formatMoney(metrics.expenses)}</strong>
                   </div>
                   <div className="record__stat">
                     <span>НЗ</span>
-                    <strong>−{formatMoney(record.reserve)}</strong>
+                    <strong>{formatMoney(record.reserve)}</strong>
                   </div>
                   <div className="record__stat">
-                    <span>В кассе</span>
-                    <strong>{formatMoney(record.cash)}</strong>
+                    <span>Комиссия {formatPercent(rate)}</span>
+                    <strong className="is-negative">−{formatMoney(metrics.commission)}</strong>
+                  </div>
+                  <div className="record__stat">
+                    <span>Итог дня</span>
+                    <strong>{formatMoney(metrics.revenue)}</strong>
                   </div>
                   <div className="record__stat record__stat--total">
                     <span>Остаток дня</span>
-                    <strong className={balance < 0 ? 'is-negative' : ''} style={{ color: balance < 0 ? undefined : meta.accent }}>
-                      {formatMoney(balance)}
+                    <strong
+                      className={metrics.balance < 0 ? 'is-negative' : ''}
+                      style={{ color: metrics.balance < 0 ? undefined : meta.accent }}
+                    >
+                      {formatMoney(metrics.balance)}
                     </strong>
                   </div>
                 </div>
@@ -310,7 +359,7 @@ export function History() {
                   >
                     <ChevronDownIcon size={16} />
                     <span>
-                      Расходы: {record.expenses.length} · {formatMoney(expenses)}
+                      Расходы: {record.expenses.length} · {formatMoney(metrics.expenses)}
                     </span>
                   </button>
                   <span className="record__updated">
@@ -342,17 +391,49 @@ export function History() {
         </div>
       )}
 
+      {filteredAdjustments.length > 0 ? (
+        <section className="card card--pad">
+          <div className="card__header" style={{ padding: 0 }}>
+            <div>
+              <h2 className="card__title">Движения за период</h2>
+              <p className="card__hint">
+                Поступления и изъятия не входят в выручку — только меняют остатки
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => navigate('adjustments')}
+            >
+              <span>Все движения</span>
+              <ChevronRightIcon size={16} />
+            </button>
+          </div>
+          <ul className="movement-list movement-list--compact">
+            {filteredAdjustments.map((item) => (
+              <li key={item.id} className="movement">
+                <span className="movement__date">{formatDateWithWeekday(item.date)}</span>
+                <CompanyBadge company={item.company} />
+                <span className="movement__target">
+                  {item.target === 'cash' ? 'Наличные' : item.target === 'terminal' ? 'Терминал' : 'НЗ'}
+                  <span className="movement__direction">
+                    {item.direction === 'in' ? 'положили' : 'забрали'}
+                  </span>
+                </span>
+                <span className="movement__comment">{item.comment || '—'}</span>
+                <span className={`movement__amount movement__amount--${item.direction}`}>
+                  {item.direction === 'in' ? '+' : '−'}
+                  {formatMoney(item.amount)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <p className="screen__note">
-        Экспорт выгружает только текущую выборку — удобно отправить отчёт за месяц по одной
-        компании.{' '}
-        <button
-          type="button"
-          className="link-btn"
-          onClick={() => navigate('day', { company: data.settings.lastCompany, date: todayIso() })}
-        >
-          Записать день
-          <ChevronRightIcon size={14} />
-        </button>
+        Экспорт выгружает текущую выборку: дни, движения денег и итоги по периоду.{' '}
+        {totals.records > 0 ? `Записей: ${formatNumber(totals.records)}.` : ''}
       </p>
 
       <ConfirmDialog
