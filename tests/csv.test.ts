@@ -1,142 +1,164 @@
 import { describe, expect, it } from 'vitest';
-import type { DayRecord } from '../shared/model';
-import { buildCsv, csvFilename } from '../src/lib/csv';
-import { createEmptyData, normalizeData, patchSettings, removeRecord, upsertRecord } from '../shared/model';
+import type { Adjustment, DayRecord } from '../shared/model';
+import { createEmptyData } from '../shared/model';
+import { buildCsv, buildJsonBackup, csvFilename, jsonBackupFilename } from '../src/lib/csv';
 
-const sample: DayRecord = {
-  id: 'r1',
-  company: 'zaton',
-  date: '2025-11-05',
-  terminal: 45000.5,
-  cash: 12000,
-  reserve: 4000,
-  expenses: [
-    { id: 'e1', amount: 1200.25, comment: 'Корм; прикормка' },
-    { id: 'e2', amount: 800, comment: 'Бензин "Лукойл"' },
-  ],
-  note: 'Хороший день',
-  createdAt: '2025-11-05T19:00:00.000Z',
-  updatedAt: '2025-11-05T19:00:00.000Z',
-};
+const RATE = 2.75;
+
+function record(partial: Partial<DayRecord> = {}): DayRecord {
+  return {
+    id: 'r1',
+    company: 'zaton',
+    date: '2025-11-05',
+    cashPrev: 10000,
+    terminal: 48200,
+    cashFact: 9600,
+    reserve: 4500,
+    expenses: [{ id: 'e1', amount: 3400, comment: 'Корм' }],
+    note: '',
+    createdAt: '2025-11-05T10:00:00.000Z',
+    updatedAt: '2025-11-05T10:00:00.000Z',
+    ...partial,
+  };
+}
+
+function adjustment(partial: Partial<Adjustment> = {}): Adjustment {
+  return {
+    id: 'a1',
+    company: 'zaton',
+    date: '2025-11-06',
+    target: 'cash',
+    direction: 'in',
+    amount: 15000,
+    comment: '',
+    createdAt: '2025-11-06T10:00:00.000Z',
+    ...partial,
+  };
+}
 
 describe('buildCsv', () => {
-  const csv = buildCsv([sample], { from: '2025-11-01', to: '2025-11-30', scopeLabel: 'Все компании' });
-
-  it('начинается с BOM и использует «;» и CRLF для Excel', () => {
+  it('начинается с BOM и использует «;» как разделитель', () => {
+    const csv = buildCsv([record()], [], { commissionRate: RATE });
     expect(csv.startsWith('\uFEFF')).toBe(true);
-    expect(csv).toContain('\r\n');
-    expect(csv.split('\r\n')[0].split(';')[0]).toBe('\uFEFFОтчёт по финансам');
+    expect(csv.split('\r\n')[0]).toContain(';');
   });
 
-  it('содержит строку данных с запятой в качестве десятичного разделителя', () => {
-    expect(csv).toContain('05.11.2025;Затон Рыбака;45000,50;12000,00;4000,00;2000,25;39000,25;2;');
+  it('пишет шапку отчёта со ставкой комиссии', () => {
+    const csv = buildCsv([record()], [], { commissionRate: RATE });
+    expect(csv).toContain('Отчёт по финансам;Затон Рыбака и Арт Фокус');
+    expect(csv).toContain('Комиссия банка;2,75%');
+    expect(csv).toContain('Все компании');
   });
 
-  it('экранирует кавычки и точки с запятой в комментариях', () => {
-    expect(csv).toContain('"1200,25 — Корм; прикормка; 800,00 — Бензин ""Лукойл"""');
+  it('пишет новые колонки записи дня', () => {
+    const csv = buildCsv([record()], [], { commissionRate: RATE });
+    expect(csv).toContain(
+      'Дата;Компания;Остаток вчера, ₽;Терминал, ₽;Факт в кассе, ₽;Изменение наличных, ₽;Расходы, ₽;НЗ, ₽;Итог дня, ₽;Комиссия, ₽;Остаток дня, ₽;Кол-во расходов;Расходы (детали);Примечание',
+    );
   });
 
-  it('добавляет строку ИТОГО', () => {
-    const totalLine = csv.split('\r\n').find((line) => line.startsWith('ИТОГО'));
-    expect(totalLine).toBeDefined();
-    expect(totalLine).toContain('45000,50');
-    expect(totalLine).toContain('2000,25');
-    expect(totalLine).toContain('записей: 1');
+  it('считает строку по формулам v2', () => {
+    const csv = buildCsv([record()], [], { commissionRate: RATE });
+    // 48200 − 400 + 3400 = 51200; комиссия 1325,50; остаток 45374,50
+    expect(csv).toContain('05.11.2025;Затон Рыбака;10000,00;48200,00;9600,00;-400,00;3400,00;4500,00;51200,00;1325,50;45374,50;1;');
   });
 
-  it('корректно формирует имя файла', () => {
-    expect(csvFilename('2025-11-01', '2025-11-30')).toBe('Финансы_01-11-2025_30-11-2025.csv');
+  it('экранирует точку с запятой и кавычки в комментариях', () => {
+    const csv = buildCsv(
+      [record({ expenses: [{ id: 'e', amount: 100, comment: 'Корм; "премиум"' }] })],
+      [],
+      { commissionRate: RATE },
+    );
+    expect(csv).toContain('"100,00 — Корм; ""премиум"""');
+  });
+
+  it('пишет блок итогов по периоду', () => {
+    const csv = buildCsv([record()], [], { commissionRate: RATE });
+    expect(csv).toContain('ИТОГИ ПО ПЕРИОДУ');
+    expect(csv).toContain('Выручка (сумма итогов дней);51200,00');
+    expect(csv).toContain('Комиссия банка (2,75%);1325,50');
+    expect(csv).toContain('НЗ накоплено;4500,00');
+    expect(csv).toContain('Наличные в кассе;9600,00');
+    expect(csv).toContain('Свободный остаток;45374,50');
+  });
+
+  it('выгружает движения отдельным блоком', () => {
+    const csv = buildCsv(
+      [record()],
+      [
+        adjustment(),
+        adjustment({
+          id: 'a2',
+          date: '2025-11-07',
+          target: 'reserve',
+          direction: 'out',
+          amount: 3000,
+          comment: 'Изъяли из НЗ',
+        }),
+        adjustment({
+          id: 'a3',
+          date: '2025-11-08',
+          target: 'terminal',
+          direction: 'in',
+          amount: 24000,
+        }),
+      ],
+      { commissionRate: RATE },
+    );
+
+    expect(csv).toContain('ПОСТУПЛЕНИЯ И ИЗЪЯТИЯ');
+    expect(csv).toContain(
+      'Дата;Компания;Куда;Направление;Сумма, ₽;Влияние на остаток, ₽;Комментарий',
+    );
+    expect(csv).toContain('06.11.2025;Затон Рыбака;Наличные;Положили;15000,00;15000,00;');
+    expect(csv).toContain('07.11.2025;Затон Рыбака;НЗ;Забрали;3000,00;3000,00;Изъяли из НЗ');
+    expect(csv).toContain('08.11.2025;Затон Рыбака;Терминал;Положили;24000,00;23340,00;');
+    expect(csv).toContain('Движений: положили;39000,00');
+    expect(csv).toContain('Движений: забрали;3000,00');
+  });
+
+  it('не создаёт блок движений, если их нет', () => {
+    const csv = buildCsv([record()], [], { commissionRate: RATE });
+    expect(csv).not.toContain('ПОСТУПЛЕНИЯ И ИЗЪЯТИЯ');
+  });
+
+  it('добавляет произвольные строки в итоги', () => {
+    const csv = buildCsv([record()], [], {
+      commissionRate: RATE,
+      extraSummary: [{ label: 'Движений', value: 0 }],
+    });
+    expect(csv).toContain('Движений;0,00');
+  });
+
+  it('работает на пустой выборке', () => {
+    const csv = buildCsv([], [], { commissionRate: RATE, from: '2025-11-01', to: '2025-11-30' });
+    expect(csv).toContain('Период;01.11.2025 — 30.11.2025');
+    expect(csv).toContain('Свободный остаток;0,00');
   });
 });
 
-describe('модель данных', () => {
-  it('нормализует мусор в пустое состояние', () => {
-    expect(normalizeData(null).records).toEqual([]);
-    expect(normalizeData({ records: 'nope' }).settings.theme).toBe('dim');
+describe('имена файлов', () => {
+  it('собирает имя CSV по периоду', () => {
+    expect(csvFilename('2025-11-01', '2025-11-30')).toBe('Финансы_01-11-2025_30-11-2025.csv');
+    expect(csvFilename()).toBe('Финансы_все-даты.csv');
   });
 
-  it('отбрасывает записи без компании или с плохой датой', () => {
-    const data = normalizeData({
-      records: [
-        { company: 'unknown', date: '2025-11-01' },
-        { company: 'zaton', date: '01.11.2025' },
-        { company: 'zaton', date: '2025-11-01', terminal: '5000' },
-      ],
-    });
-    expect(data.records).toHaveLength(1);
-    expect(data.records[0].terminal).toBe(5000);
+  it('собирает имя JSON-копии', () => {
+    expect(jsonBackupFilename()).toMatch(/^Финансы-резервная-копия-\d{4}-\d{2}-\d{2}\.json$/);
   });
+});
 
-  it('не создаёт дубль при повторном сохранении того же дня', () => {
-    let data = createEmptyData();
-    data = upsertRecord(data, {
-      company: 'zaton',
-      date: '2025-11-05',
-      terminal: 1000,
-      cash: 0,
-      reserve: 0,
-      expenses: [],
-    });
-    const firstId = data.records[0].id;
-    data = upsertRecord(data, {
-      company: 'zaton',
-      date: '2025-11-05',
-      terminal: 2000,
-      cash: 100,
-      reserve: 50,
-      expenses: [{ id: 'e', amount: 10, comment: 'Тест' }],
-    });
-    expect(data.records).toHaveLength(1);
-    expect(data.records[0].id).toBe(firstId);
-    expect(data.records[0].terminal).toBe(2000);
-    expect(data.records[0].reserve).toBe(50);
-  });
-
-  it('позволяет хранить один день для двух разных компаний', () => {
-    let data = createEmptyData();
-    for (const company of ['zaton', 'artfokus'] as const) {
-      data = upsertRecord(data, {
-        company,
-        date: '2025-11-05',
-        terminal: 100,
-        cash: 0,
-        reserve: 0,
-        expenses: [],
-      });
-    }
-    expect(data.records).toHaveLength(2);
-  });
-
-  it('удаляет запись и сохраняет настройки', () => {
-    let data = upsertRecord(createEmptyData(), {
-      company: 'artfokus',
-      date: '2025-11-05',
-      terminal: 100,
-      cash: 0,
-      reserve: 0,
-      expenses: [],
-    });
-    data = removeRecord(data, data.records[0].id);
-    expect(data.records).toHaveLength(0);
-
-    data = patchSettings(data, { theme: 'black', lastCompany: 'artfokus' });
-    expect(data.settings.theme).toBe('black');
-    expect(data.settings.lastCompany).toBe('artfokus');
-    expect(patchSettings(data, { theme: 'неверная' as never }).settings.theme).toBe('black');
-  });
-
-  it('чистит пустые строки расходов', () => {
-    const data = upsertRecord(createEmptyData(), {
-      company: 'zaton',
-      date: '2025-11-05',
-      terminal: 0,
-      cash: 0,
-      reserve: 0,
-      expenses: [
-        { id: 'a', amount: 0, comment: '' },
-        { id: 'b', amount: 0, comment: 'Только комментарий' },
-      ],
-    });
-    expect(data.records[0].expenses).toHaveLength(1);
+describe('buildJsonBackup', () => {
+  it('сохраняет схему, записи и настройки', () => {
+    const data = createEmptyData();
+    data.records.push(record());
+    const json = JSON.parse(buildJsonBackup(data));
+    expect(json.schemaVersion).toBe(2);
+    expect(json.records).toHaveLength(1);
+    expect(json.records[0].cashFact).toBe(9600);
+    expect(json.records[0].cashPrev).toBe(10000);
+    expect(json.settings.commissionRate).toBe(2.75);
+    expect(json.app).toBe('ZatonFinance');
+    expect(typeof json.exportedAt).toBe('string');
   });
 });

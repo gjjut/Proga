@@ -175,3 +175,14 @@ export function recordsLabel(count: number): string {
 export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+/** 2.75 → «2,75%» */
+export function formatPercent(value: number): string {
+  return `${formatNumber(value)}%`;
+}
+
+/** Сумма со знаком: 1500 → «+1 500 ₽», −1500 → «−1 500 ₽» */
+export function formatSignedMoney(value: number): string {
+  const sign = value > 0 ? '+' : value < 0 ? '−' : '';
+  return `${sign}${formatMoney(Math.abs(value))}`;
+}

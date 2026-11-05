@@ -1,11 +1,22 @@
-import { companyById, type AppData, type DayRecord } from '../../shared/model';
+import {
+  DEFAULT_COMMISSION_RATE,
+  companyById,
+  type Adjustment,
+  type AppData,
+  type AdjustmentTarget,
+  type DayRecord,
+} from '../../shared/model';
 import { round2 } from '../../shared/model';
 import { formatDateShort } from './format';
-import { sortByDateAsc, totalsOf } from './calc';
+import { dayMetrics, sortByDateAsc, totalsOf } from './calc';
 
 function escapeCell(value: string): string {
   if (/[;"\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
   return value;
+}
+
+function numCell(value: number): string {
+  return round2(value).toFixed(2).replace('.', ',');
 }
 
 function row(cells: (string | number)[]): string {
@@ -14,24 +25,44 @@ function row(cells: (string | number)[]): string {
     .join(';');
 }
 
-function numCell(value: number): string {
-  return round2(value).toFixed(2).replace('.', ',');
-}
+const TARGET_LABELS: Record<AdjustmentTarget, string> = {
+  cash: 'Наличные',
+  terminal: 'Терминал',
+  reserve: 'НЗ',
+};
 
 export interface CsvOptions {
   from?: string;
   to?: string;
   /** Подпись выборки, попадает в шапку отчёта */
   scopeLabel?: string;
+  commissionRate?: number;
+  /** Заголовок отчёта */
+  title?: string;
+  /** Строки «Показатель;Значение» в блоке итогов */
+  extraSummary?: { label: string; value: string | number }[];
+}
+
+function nowStamp(): string {
+  const now = new Date();
+  const date = `${`${now.getDate()}`.padStart(2, '0')}.${`${now.getMonth() + 1}`.padStart(2, '0')}.${now.getFullYear()}`;
+  return `${date} ${`${now.getHours()}`.padStart(2, '0')}:${`${now.getMinutes()}`.padStart(2, '0')}`;
 }
 
 /**
  * CSV для Excel: UTF-8 с BOM, разделитель «;», десятичная запятая.
  * Excel открывает такой файл двойным щелчком без «кракозябр» и без импорта.
  */
-export function buildCsv(records: DayRecord[], options: CsvOptions = {}): string {
+export function buildCsv(
+  records: DayRecord[],
+  adjustments: Adjustment[] = [],
+  options: CsvOptions = {},
+): string {
+  const rate = options.commissionRate ?? DEFAULT_COMMISSION_RATE;
   const sorted = sortByDateAsc(records);
-  const totals = totalsOf(sorted);
+  const sortedAdjustments = sortByDateAsc(adjustments);
+  const totals = totalsOf(sorted, sortedAdjustments, rate);
+
   const period =
     options.from && options.to
       ? `${formatDateShort(options.from)} — ${formatDateShort(options.to)}`
@@ -39,26 +70,27 @@ export function buildCsv(records: DayRecord[], options: CsvOptions = {}): string
         ? `${formatDateShort(sorted[0].date)} — ${formatDateShort(sorted[sorted.length - 1].date)}`
         : 'нет данных';
 
-  const now = new Date();
-  const createdAt = `${formatDateShort(
-    `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, '0')}-${`${now.getDate()}`.padStart(2, '0')}`,
-  )} ${`${now.getHours()}`.padStart(2, '0')}:${`${now.getMinutes()}`.padStart(2, '0')}`;
-
   const lines: string[] = [];
-  lines.push(row(['Отчёт по финансам', 'Затон Рыбака и Арт Фокус']));
+  lines.push(row([options.title ?? 'Отчёт по финансам', 'Затон Рыбака и Арт Фокус']));
   lines.push(row(['Период', period]));
   lines.push(row(['Выборка', options.scopeLabel ?? 'Все компании']));
-  lines.push(row(['Сформирован', createdAt]));
+  lines.push(row(['Комиссия банка', `${numCell(rate)}%`]));
+  lines.push(row(['Сформирован', nowStamp()]));
   lines.push('');
+
   lines.push(
     row([
       'Дата',
       'Компания',
+      'Остаток вчера, ₽',
       'Терминал, ₽',
-      'Наличные в кассе, ₽',
-      'НЗ, ₽',
+      'Факт в кассе, ₽',
+      'Изменение наличных, ₽',
       'Расходы, ₽',
-      'Остаток за день, ₽',
+      'НЗ, ₽',
+      'Итог дня, ₽',
+      'Комиссия, ₽',
+      'Остаток дня, ₽',
       'Кол-во расходов',
       'Расходы (детали)',
       'Примечание',
@@ -66,7 +98,7 @@ export function buildCsv(records: DayRecord[], options: CsvOptions = {}): string
   );
 
   for (const record of sorted) {
-    const expenses = round2(record.expenses.reduce((sum, expense) => sum + expense.amount, 0));
+    const metrics = dayMetrics(record, rate);
     const details = record.expenses
       .map(
         (expense) =>
@@ -79,11 +111,15 @@ export function buildCsv(records: DayRecord[], options: CsvOptions = {}): string
       row([
         formatDateShort(record.date),
         companyById(record.company).name,
+        record.cashPrev,
         record.terminal,
-        record.cash,
+        record.cashFact,
+        metrics.cashChange,
+        metrics.expenses,
         record.reserve,
-        expenses,
-        round2(record.terminal - expenses - record.reserve),
+        metrics.revenue,
+        metrics.commission,
+        metrics.balance,
         String(record.expenses.length),
         details,
         record.note,
@@ -91,32 +127,77 @@ export function buildCsv(records: DayRecord[], options: CsvOptions = {}): string
     );
   }
 
+  if (sortedAdjustments.length > 0) {
+    lines.push('');
+    lines.push(row(['ПОСТУПЛЕНИЯ И ИЗЪЯТИЯ']));
+    lines.push(
+      row([
+        'Дата',
+        'Компания',
+        'Куда',
+        'Направление',
+        'Сумма, ₽',
+        'Влияние на остаток, ₽',
+        'Комментарий',
+      ]),
+    );
+
+    for (const adjustment of sortedAdjustments) {
+      let impact = 0;
+      if (adjustment.target === 'cash') {
+        impact = adjustment.direction === 'in' ? adjustment.amount : -adjustment.amount;
+      } else if (adjustment.target === 'reserve') {
+        impact = adjustment.direction === 'in' ? -adjustment.amount : adjustment.amount;
+      } else {
+        impact =
+          adjustment.direction === 'in'
+            ? round2(adjustment.amount - (adjustment.amount * rate) / 100)
+            : -adjustment.amount;
+      }
+      lines.push(
+        row([
+          formatDateShort(adjustment.date),
+          companyById(adjustment.company).name,
+          TARGET_LABELS[adjustment.target],
+          adjustment.direction === 'in' ? 'Положили' : 'Забрали',
+          adjustment.amount,
+          impact,
+          adjustment.comment,
+        ]),
+      );
+    }
+  }
+
   lines.push('');
-  lines.push(
-    row([
-      'ИТОГО',
-      '',
-      totals.revenue,
-      totals.cash,
-      totals.reserve,
-      totals.expenses,
-      totals.balance,
-      String(totals.expenseCount),
-      `записей: ${totals.records}`,
-      '',
-    ]),
-  );
-  lines.push(row(['Свободный остаток', 'Выручка − Расходы − НЗ', totals.balance]));
+  lines.push(row(['ИТОГИ ПО ПЕРИОДУ']));
+  lines.push(row(['Показатель', 'Значение, ₽']));
+  lines.push(row(['Выручка (сумма итогов дней)', totals.revenue]));
+  lines.push(row([`Комиссия банка (${numCell(rate)}%)`, totals.commission]));
+  lines.push(row(['Расходы', totals.expenses]));
+  lines.push(row(['НЗ накоплено', totals.reserve]));
+  lines.push(row(['Наличные в кассе', totals.cash]));
+  lines.push(row(['Свободный остаток', totals.balance]));
+  lines.push(row(['Записей дней', totals.records]));
+  lines.push(row(['Строк расходов', totals.expenseCount]));
+
+  for (const line of options.extraSummary ?? []) {
+    lines.push(row([line.label, line.value]));
+  }
+
+  if (totals.adjustments.inTotal > 0 || totals.adjustments.outTotal > 0) {
+    lines.push(row(['Движений: положили', totals.adjustments.inTotal]));
+    lines.push(row(['Движений: забрали', totals.adjustments.outTotal]));
+  }
 
   return `\uFEFF${lines.join('\r\n')}\r\n`;
 }
 
-export function csvFilename(from?: string, to?: string): string {
+export function csvFilename(from?: string, to?: string, prefix = 'Финансы'): string {
   const period =
     from && to
       ? `${formatDateShort(from).replace(/\./g, '-')}_${formatDateShort(to).replace(/\./g, '-')}`
       : 'все-даты';
-  return `Финансы_${period}.csv`;
+  return `${prefix}_${period}.csv`;
 }
 
 export function buildJsonBackup(data: AppData): string {

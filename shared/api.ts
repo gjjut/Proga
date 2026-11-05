@@ -3,9 +3,9 @@
  * Реализуется дважды: electron/preload.ts (реальный мост) и src/lib/api.ts (браузерный адаптер).
  */
 import type { AppData, Settings } from './model';
-import type { DayRecordInput } from './model';
+import type { AdjustmentInput, DayRecordInput } from './model';
 
-export type { DayRecordInput } from './model';
+export type { AdjustmentInput, DayRecordInput } from './model';
 
 export interface AppInfo {
   version: string;
@@ -33,6 +33,8 @@ export interface FinanceApi {
   load(): Promise<AppData>;
   saveRecord(input: DayRecordInput): Promise<AppData>;
   deleteRecord(id: string): Promise<AppData>;
+  saveAdjustment(input: AdjustmentInput): Promise<AppData>;
+  deleteAdjustment(id: string): Promise<AppData>;
   updateSettings(patch: Partial<Settings>): Promise<AppData>;
   replaceData(data: unknown): Promise<AppData>;
   exportFile(payload: ExportPayload): Promise<ExportResult>;

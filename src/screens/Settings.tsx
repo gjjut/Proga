@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { ThemeMode } from '../../shared/model';
 import {
   ArrowUpRightIcon,
+  BanknoteIcon,
   CheckIcon,
   DownloadIcon,
   FolderIcon,
@@ -13,7 +14,7 @@ import {
   UploadIcon,
 } from '../components/Icons';
 import { ConfirmDialog } from '../components/Modal';
-import { recordsLabel } from '../lib/format';
+import { formatPercent, parseMoneyInput, recordsLabel } from '../lib/format';
 import { useApp } from '../state';
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -44,12 +45,14 @@ const THEMES: { id: ThemeMode; title: string; subtitle: string; bg: string; surf
 ];
 
 const FORMULAS: { label: string; value: string }[] = [
-  { label: 'Выручка', value: 'сумма всех значений «Сумма по терминалу»' },
-  { label: 'Расходы', value: 'сумма всех строк расходов' },
-  { label: 'НЗ', value: 'сумма всех значений «Положено в НЗ»' },
-  { label: 'Остаток', value: 'выручка − расходы − НЗ' },
-  { label: 'Наличные в кассе', value: 'остаток по самой свежей записи компании' },
-  { label: 'Остаток дня', value: 'терминал − расходы − НЗ за конкретный день' },
+  { label: 'Изменение наличных', value: 'факт в кассе − остаток наличных вчера' },
+  { label: 'Итог дня (выручка)', value: 'терминал + изменение наличных + расходы' },
+  { label: 'Комиссия банка', value: 'терминал × ставка (по умолчанию 2,75%)' },
+  { label: 'НЗ', value: 'сумма, отложенная в неприкосновенный запас (без комиссии)' },
+  { label: 'Остаток дня', value: 'итог дня − комиссия − НЗ' },
+  { label: 'Свободный остаток', value: 'выручка − комиссия − НЗ ± движения денег' },
+  { label: 'Наличные в кассе', value: 'факт последней записи + движения по наличке после неё' },
+  { label: 'Расходы', value: 'справочно: из фактических денег не вычитаются' },
 ];
 
 export function Settings() {
@@ -63,8 +66,10 @@ export function Settings() {
     clearAll,
     openDataFolder,
     openExternal,
+    notify,
   } = useApp();
   const [confirmClear, setConfirmClear] = useState(false);
+  const [rateInput, setRateInput] = useState(() => String(data.settings.commissionRate).replace('.', ','));
 
   const companyCounts = useMemo(
     () => ({
@@ -75,13 +80,24 @@ export function Settings() {
   );
 
   const theme = data.settings.theme;
+  const parsedRate = parseMoneyInput(rateInput);
+  const rateValid = parsedRate > 0 && parsedRate <= 100;
+
+  const saveRate = () => {
+    if (!rateValid) {
+      notify('Ставка должна быть больше 0 и не больше 100%', 'error');
+      return;
+    }
+    void updateSettings({ commissionRate: parsedRate });
+    notify('Ставка комиссии обновлена', 'success');
+  };
 
   return (
     <div className="screen">
       <header className="screen__header">
         <div className="screen__title-wrap">
           <h1 className="screen__title">Настройки</h1>
-          <p className="screen__subtitle">Внешний вид, данные и справка</p>
+          <p className="screen__subtitle">Внешний вид, комиссия банка, данные и справка</p>
         </div>
       </header>
 
@@ -124,6 +140,54 @@ export function Settings() {
 
       <section className="card card--pad settings-block">
         <div className="settings-block__head">
+          <h2 className="card__title">Комиссия банка</h2>
+          <p className="card__hint">
+            Удерживается с суммы по терминалу. Сейчас применяется ставка{' '}
+            {formatPercent(data.settings.commissionRate)}
+          </p>
+        </div>
+
+        <div className="rate-row">
+          <label className="field rate-field">
+            <span className="field__label">Ставка эквайринга</span>
+            <div className="rate-field__control">
+              <input
+                className="input"
+                type="text"
+                inputMode="decimal"
+                value={rateInput}
+                onChange={(event) => setRateInput(event.target.value.replace(/[^\d.,]/g, ''))}
+                onBlur={() => {
+                  if (rateValid) setRateInput(String(parsedRate).replace('.', ','));
+                }}
+                aria-label="Ставка комиссии банка в процентах"
+              />
+              <span className="rate-field__suffix">%</span>
+            </div>
+          </label>
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={saveRate}
+            disabled={!rateValid || parsedRate === data.settings.commissionRate}
+          >
+            <BanknoteIcon size={17} />
+            <span>Применить ставку</span>
+          </button>
+        </div>
+
+        <p className="settings-note">
+          <InfoIcon size={16} />
+          <span>
+            Ставка применяется ко всем записям при пересчёте: комиссия = сумма по терминалу ×
+            ставка. На НЗ комиссия не начисляется. Поступления через терминал в разделе «Движения»
+            тоже учитываются за вычетом комиссии.
+          </span>
+        </p>
+      </section>
+
+      <section className="card card--pad settings-block">
+        <div className="settings-block__head">
           <h2 className="card__title">Данные</h2>
           <p className="card__hint">
             {isDesktop
@@ -139,8 +203,12 @@ export function Settings() {
 
         <div className="data-stats">
           <div className="data-stat">
-            <span>Всего записей</span>
+            <span>Записей дней</span>
             <strong>{data.records.length}</strong>
+          </div>
+          <div className="data-stat">
+            <span>Движений денег</span>
+            <strong>{data.adjustments.length}</strong>
           </div>
           <div className="data-stat">
             <span>Затон Рыбака</span>
@@ -173,17 +241,18 @@ export function Settings() {
             type="button"
             className="btn btn--ghost btn--danger-hover"
             onClick={() => setConfirmClear(true)}
-            disabled={data.records.length === 0}
+            disabled={data.records.length === 0 && data.adjustments.length === 0}
           >
             <TrashIcon size={17} />
-            <span>Очистить все записи</span>
+            <span>Очистить все данные</span>
           </button>
         </div>
 
         <p className="settings-note">
           <ShieldIcon size={16} />
           <span>
-            {recordsLabel(data.records.length)}. Перед каждой записью автоматически создаётся файл
+            {recordsLabel(data.records.length)} и {data.adjustments.length} движений. Перед каждой
+            записью автоматически создаётся файл
             <code> finance-data.backup.json</code> — при повреждении основного файла данные
             восстановятся из него.
           </span>
@@ -249,11 +318,12 @@ export function Settings() {
 
       <ConfirmDialog
         open={confirmClear}
-        title="Очистить все записи?"
+        title="Очистить все данные?"
         description={
           <>
-            Будут удалены <strong>все {data.records.length} записей</strong> обеих компаний.
-            Действие необратимо — сначала лучше скачать резервную копию.
+            Будут удалены <strong>все {data.records.length} записей</strong> и{' '}
+            <strong>{data.adjustments.length} движений</strong> обеих компаний. Действие
+            необратимо — сначала лучше скачать резервную копию.
           </>
         }
         confirmLabel="Удалить всё"

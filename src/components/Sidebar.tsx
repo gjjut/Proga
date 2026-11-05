@@ -6,6 +6,7 @@ import {
   HomeIcon,
   MoonIcon,
   PenIcon,
+  RepeatIcon,
   SettingsIcon,
   SunIcon,
   type IconProps,
@@ -20,6 +21,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Главное', icon: HomeIcon },
   { id: 'day', label: 'Запись дня', icon: PenIcon },
+  { id: 'adjustments', label: 'Поступления', icon: RepeatIcon },
   { id: 'history', label: 'История', icon: ClockIcon },
   { id: 'settings', label: 'Настройки', icon: SettingsIcon },
 ];

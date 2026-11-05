@@ -45,17 +45,19 @@ async function fill(locator, value) {
 }
 
 await page.goto(BASE_URL, { waitUntil: 'networkidle' });
-await page.waitForSelector('.hero', { timeout: 30000 });
+await page.waitForSelector('.hero, .empty-state', { timeout: 30000 });
 await shot('dashboard');
 
 // ── Запись дня: заполняем поля, чтобы на скриншоте были живые цифры ──
 await navTo('Запись дня');
 await page.waitForSelector('.day-summary');
 
+// 0 — остаток наличных вчера, 1 — терминал, 2 — факт в кассе, 3 — НЗ
 const moneyInputs = page.locator('input.input--money');
-await fill(moneyInputs.nth(0), '48200');
-await fill(moneyInputs.nth(1), '9600');
-await fill(moneyInputs.nth(2), '4500');
+await fill(moneyInputs.nth(0), '10000');
+await fill(moneyInputs.nth(1), '48200');
+await fill(moneyInputs.nth(2), '9600');
+await fill(moneyInputs.nth(3), '4500');
 
 await fill(page.locator('.expense-row__amount input').first(), '3400');
 await fill(page.locator('.expense-row__comment').first(), 'Корм и прикормка, база на Ленина');
@@ -65,6 +67,13 @@ await fill(page.locator('.expense-row__amount input').nth(1), '1800');
 await fill(page.locator('.expense-row__comment').nth(1), 'Бензин для генератора');
 await page.locator('.screen__title').click();
 await shot('day-entry');
+
+// ── Поступления и изъятия ──
+await navTo('Поступления');
+await page.waitForSelector('.adjust-form');
+await fill(page.locator('.adjust-form input.input--money'), '15000');
+await fill(page.locator('.adjust-form__comment input'), 'Внесли личные деньги в кассу');
+await shot('adjustments');
 
 // ── История ──
 await navTo('История');
@@ -78,11 +87,17 @@ await page.waitForSelector('.theme-option');
 await shot('settings');
 
 // ── Чёрная тема ──
-await page.locator('.theme-option', { hasText: 'Lights out' }).click();
-await page.waitForTimeout(300);
-await navTo('Главное');
-await page.waitForSelector('.hero');
-await shot('dashboard-black');
+// Смену темы не считаем критичной: если кнопка не нашлась, просто пропускаем кадр.
+try {
+  await page.locator('.theme-option', { hasText: 'Lights out' }).first().click();
+  await page.waitForTimeout(400);
+  await shot('settings-black');
+  await navTo('Главное');
+  await page.waitForSelector('.hero, .empty-state', { timeout: 20000 });
+  await shot('dashboard-black');
+} catch (error) {
+  console.warn('Тёмную тему снять не удалось:', error.message);
+}
 
 await browser.close();
 console.log('Готово');

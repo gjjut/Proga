@@ -2,10 +2,18 @@
  * Единая модель данных приложения.
  * Модуль используется и в main-процессе (Node), и в рендерере (браузер),
  * поэтому здесь нет ни Node-, ни DOM-специфичного кода.
+ *
+ * Схема v2 (текущая):
+ *   • у записи дня появились «остаток наличных вчера» и «факт в кассе»;
+ *   • итог дня = терминал + (факт − вчера) + расходы;
+ *   • появились сторонние движения денег (поступления / изъятия);
+ *   • комиссия банка задаётся процентом в настройках.
  */
 
 export type CompanyId = 'zaton' | 'artfokus';
 export type ThemeMode = 'dim' | 'black';
+export type AdjustmentTarget = 'cash' | 'terminal' | 'reserve';
+export type AdjustmentDirection = 'in' | 'out';
 
 export interface Company {
   id: CompanyId;
@@ -25,11 +33,13 @@ export interface DayRecord {
   company: CompanyId;
   /** Локальная дата в формате YYYY-MM-DD */
   date: string;
-  /** Сумма по терминалу — выручка дня */
+  /** Остаток наличных в кассе на начало дня (из предыдущей записи, можно поправить) */
+  cashPrev: number;
+  /** Сумма по терминалу за день */
   terminal: number;
-  /** Остаток наличных в кассе на конец дня */
-  cash: number;
-  /** Сумма, отложенная в неприкосновенный запас */
+  /** Фактическое наличие наличных в кассе на конец дня (включая отложенное в НЗ) */
+  cashFact: number;
+  /** Сумма, отложенная в НЗ за день */
   reserve: number;
   expenses: Expense[];
   note: string;
@@ -37,15 +47,53 @@ export interface DayRecord {
   updatedAt: string;
 }
 
+/** Стороннее движение денег: не входит в итог дня и выручку, но меняет остатки. */
+export interface Adjustment {
+  id: string;
+  company: CompanyId;
+  date: string;
+  target: AdjustmentTarget;
+  /** in — положить/поступило, out — забрать/изъято */
+  direction: AdjustmentDirection;
+  amount: number;
+  comment: string;
+  createdAt: string;
+}
+
 export interface Settings {
   theme: ThemeMode;
   lastCompany: CompanyId;
+  /** Ставка комиссии банка по терминалу, в процентах */
+  commissionRate: number;
 }
 
 export interface AppData {
   schemaVersion: number;
   records: DayRecord[];
+  adjustments: Adjustment[];
   settings: Settings;
+}
+
+export interface DayRecordInput {
+  id?: string;
+  company: CompanyId;
+  date: string;
+  cashPrev: number;
+  terminal: number;
+  cashFact: number;
+  reserve: number;
+  expenses: Expense[];
+  note?: string;
+}
+
+export interface AdjustmentInput {
+  id?: string;
+  company: CompanyId;
+  date: string;
+  target: AdjustmentTarget;
+  direction: AdjustmentDirection;
+  amount: number;
+  comment?: string;
 }
 
 export const COMPANIES: readonly Company[] = [
@@ -63,10 +111,19 @@ export const COMPANIES: readonly Company[] = [
   },
 ] as const;
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
+export const DEFAULT_COMMISSION_RATE = 2.75;
 
 export function isCompanyId(value: unknown): value is CompanyId {
   return value === 'zaton' || value === 'artfokus';
+}
+
+export function isAdjustmentTarget(value: unknown): value is AdjustmentTarget {
+  return value === 'cash' || value === 'terminal' || value === 'reserve';
+}
+
+export function isAdjustmentDirection(value: unknown): value is AdjustmentDirection {
+  return value === 'in' || value === 'out';
 }
 
 export function companyById(id: CompanyId): Company {
@@ -90,7 +147,10 @@ export function round2(value: number): number {
 }
 
 export function toMoney(value: unknown): number {
-  const n = typeof value === 'number' ? value : Number.parseFloat(String(value ?? '').replace(',', '.'));
+  const n =
+    typeof value === 'number'
+      ? value
+      : Number.parseFloat(String(value ?? '').replace(',', '.'));
   if (!Number.isFinite(n) || n < 0) return 0;
   return round2(n);
 }
@@ -123,16 +183,29 @@ function normalizeExpenses(raw: unknown): Expense[] {
     .filter((item) => item.amount > 0 || item.comment.length > 0);
 }
 
-function normalizeRecord(raw: unknown): DayRecord | null {
+interface NormalizedRecord extends Omit<DayRecord, 'cashPrev'> {
+  /** null — значения не было в файле, подставим из предыдущей записи компании */
+  cashPrev: number | null;
+}
+
+function normalizeRecord(raw: unknown): NormalizedRecord | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const item = raw as Record<string, unknown>;
   if (!isCompanyId(item.company) || !isIsoDate(item.date)) return null;
+
+  const hasPrev = typeof item.cashPrev === 'number' || typeof item.cashPrev === 'string';
+  const cashPrev = hasPrev ? toMoney(item.cashPrev) : null;
+
+  // Совместимость со схемой v1: там поле называлось `cash`.
+  const factSource = item.cashFact ?? item.cash;
+
   return {
     id: typeof item.id === 'string' && item.id ? item.id : newId(),
     company: item.company,
     date: item.date,
+    cashPrev,
     terminal: toMoney(item.terminal),
-    cash: toMoney(item.cash),
+    cashFact: toMoney(factSource),
     reserve: toMoney(item.reserve),
     expenses: normalizeExpenses(item.expenses),
     note: typeof item.note === 'string' ? item.note.trim().slice(0, 1000) : '',
@@ -141,35 +214,78 @@ function normalizeRecord(raw: unknown): DayRecord | null {
   };
 }
 
+function normalizeAdjustment(raw: unknown): Adjustment | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const item = raw as Record<string, unknown>;
+  if (!isCompanyId(item.company) || !isIsoDate(item.date)) return null;
+  if (!isAdjustmentTarget(item.target) || !isAdjustmentDirection(item.direction)) return null;
+  const amount = toMoney(item.amount);
+  if (amount <= 0) return null;
+
+  return {
+    id: typeof item.id === 'string' && item.id ? item.id : newId(),
+    company: item.company,
+    date: item.date,
+    target: item.target,
+    direction: item.direction,
+    amount,
+    comment: typeof item.comment === 'string' ? item.comment.trim().slice(0, 400) : '',
+    createdAt: toIsoOrNow(item.createdAt),
+  };
+}
+
 /**
- * Приводит любой (в том числе повреждённый или сторонний) объект к валидному AppData.
- * Гарантирует уникальность пары (company, date): при конфликте остаётся более свежая запись.
+ * Приводит любой (в том числе повреждённый, сторонний или старой схемы) объект
+ * к валидному AppData. Гарантирует уникальность пары (company, date) среди записей.
  */
 export function normalizeData(raw: unknown): AppData {
   const source = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
   const rawRecords = Array.isArray(source.records) ? source.records : [];
-  const byKey = new Map<string, DayRecord>();
+  const byKey = new Map<string, NormalizedRecord>();
 
   for (const candidate of rawRecords) {
     const record = normalizeRecord(candidate);
     if (!record) continue;
-    const key = `${record.company}__${record.date}`;
+    const key = recordKey(record.company, record.date);
     const existing = byKey.get(key);
     if (!existing || existing.updatedAt < record.updatedAt) {
       byKey.set(key, record);
     }
   }
 
-  const settingsSource = (typeof source.settings === 'object' && source.settings !== null
-    ? source.settings
-    : {}) as Record<string, unknown>;
+  // Подставляем «остаток вчера» из предыдущей записи той же компании (миграция v1 → v2).
+  const sorted = [...byKey.values()].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.company.localeCompare(b.company),
+  );
+  const lastFact = new Map<CompanyId, number>();
+  const records: DayRecord[] = sorted.map((record) => {
+    const cashPrev = record.cashPrev ?? lastFact.get(record.company) ?? 0;
+    lastFact.set(record.company, record.cashFact);
+    return { ...record, cashPrev };
+  });
+
+  const adjustments = (Array.isArray(source.adjustments) ? source.adjustments : [])
+    .map(normalizeAdjustment)
+    .filter((item): item is Adjustment => item !== null)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+
+  const settingsSource = (
+    typeof source.settings === 'object' && source.settings !== null ? source.settings : {}
+  ) as Record<string, unknown>;
+
+  const rawRate = Number.parseFloat(String(settingsSource.commissionRate ?? ''));
+  const commissionRate = Number.isFinite(rawRate)
+    ? round2(Math.min(100, Math.max(0, rawRate)))
+    : DEFAULT_COMMISSION_RATE;
 
   return {
     schemaVersion: SCHEMA_VERSION,
-    records: [...byKey.values()].sort((a, b) => a.date.localeCompare(b.date)),
+    records,
+    adjustments,
     settings: {
       theme: isThemeMode(settingsSource.theme) ? settingsSource.theme : 'dim',
       lastCompany: isCompanyId(settingsSource.lastCompany) ? settingsSource.lastCompany : 'zaton',
+      commissionRate,
     },
   };
 }
@@ -178,7 +294,8 @@ export function createEmptyData(): AppData {
   return {
     schemaVersion: SCHEMA_VERSION,
     records: [],
-    settings: { theme: 'dim', lastCompany: 'zaton' },
+    adjustments: [],
+    settings: { theme: 'dim', lastCompany: 'zaton', commissionRate: DEFAULT_COMMISSION_RATE },
   };
 }
 
@@ -186,18 +303,12 @@ export function recordKey(company: CompanyId, date: string): string {
   return `${company}__${date}`;
 }
 
-/* ─────────────────────────── Мутации данных ─────────────────────────── */
-
-export interface DayRecordInput {
-  id?: string;
-  company: CompanyId;
-  date: string;
-  terminal: number;
-  cash: number;
-  reserve: number;
-  expenses: Expense[];
-  note?: string;
+/** Знак движения: «положить» → +, «забрать» → −. */
+export function adjustmentSigned(adjustment: Adjustment): number {
+  return adjustment.direction === 'in' ? adjustment.amount : -adjustment.amount;
 }
+
+/* ─────────────────────────── Мутации данных ─────────────────────────── */
 
 /** Создаёт или обновляет запись дня. Инвариант: одна запись на пару (company, date). */
 export function upsertRecord(data: AppData, input: DayRecordInput): AppData {
@@ -222,32 +333,21 @@ export function upsertRecord(data: AppData, input: DayRecordInput): AppData {
   );
   const index = byId >= 0 ? byId : byDay;
 
+  const base = {
+    company: input.company,
+    date: input.date,
+    cashPrev: toMoney(input.cashPrev),
+    terminal: toMoney(input.terminal),
+    cashFact: toMoney(input.cashFact),
+    reserve: toMoney(input.reserve),
+    expenses,
+    note: typeof input.note === 'string' ? input.note.trim().slice(0, 1000) : '',
+  };
+
   if (index >= 0) {
-    const previous = records[index];
-    records[index] = {
-      ...previous,
-      company: input.company,
-      date: input.date,
-      terminal: toMoney(input.terminal),
-      cash: toMoney(input.cash),
-      reserve: toMoney(input.reserve),
-      expenses,
-      note: typeof input.note === 'string' ? input.note.trim().slice(0, 1000) : '',
-      updatedAt: now,
-    };
+    records[index] = { ...records[index], ...base, updatedAt: now };
   } else {
-    records.push({
-      id: newId(),
-      company: input.company,
-      date: input.date,
-      terminal: toMoney(input.terminal),
-      cash: toMoney(input.cash),
-      reserve: toMoney(input.reserve),
-      expenses,
-      note: typeof input.note === 'string' ? input.note.trim().slice(0, 1000) : '',
-      createdAt: now,
-      updatedAt: now,
-    });
+    records.push({ id: newId(), ...base, createdAt: now, updatedAt: now });
   }
 
   // Страховка от дублей, если запись перенесли на другую дату/компанию.
@@ -267,9 +367,47 @@ export function removeRecord(data: AppData, id: string): AppData {
   return { ...data, records: data.records.filter((record) => record.id !== id) };
 }
 
+export function upsertAdjustment(data: AppData, input: AdjustmentInput): AppData {
+  if (!isCompanyId(input.company)) throw new Error('Неизвестная компания');
+  if (!isIsoDate(input.date)) throw new Error('Некорректная дата');
+  if (!isAdjustmentTarget(input.target)) throw new Error('Неизвестный тип движения');
+  if (!isAdjustmentDirection(input.direction)) throw new Error('Неизвестное направление');
+
+  const amount = toMoney(input.amount);
+  if (amount <= 0) throw new Error('Сумма должна быть больше нуля');
+
+  const base = {
+    company: input.company,
+    date: input.date,
+    target: input.target,
+    direction: input.direction,
+    amount,
+    comment: typeof input.comment === 'string' ? input.comment.trim().slice(0, 400) : '',
+  };
+
+  const adjustments = [...data.adjustments];
+  const index = input.id ? adjustments.findIndex((item) => item.id === input.id) : -1;
+
+  if (index >= 0) {
+    adjustments[index] = { ...adjustments[index], ...base };
+  } else {
+    adjustments.push({ id: newId(), ...base, createdAt: new Date().toISOString() });
+  }
+
+  adjustments.sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+  return { ...data, adjustments };
+}
+
+export function removeAdjustment(data: AppData, id: string): AppData {
+  return { ...data, adjustments: data.adjustments.filter((item) => item.id !== id) };
+}
+
 export function patchSettings(data: AppData, patch: Partial<Settings>): AppData {
   const settings: Settings = { ...data.settings };
   if (isThemeMode(patch.theme)) settings.theme = patch.theme;
   if (isCompanyId(patch.lastCompany)) settings.lastCompany = patch.lastCompany;
+  if (typeof patch.commissionRate === 'number' && Number.isFinite(patch.commissionRate)) {
+    settings.commissionRate = round2(Math.min(100, Math.max(0, patch.commissionRate)));
+  }
   return { ...data, settings };
 }

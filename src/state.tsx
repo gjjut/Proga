@@ -11,6 +11,8 @@ import {
 import type { AppInfo } from '../shared/api';
 import {
   createEmptyData,
+  type Adjustment,
+  type AdjustmentInput,
   type AppData,
   type CompanyId,
   type DayRecord,
@@ -20,7 +22,7 @@ import {
 import { api, isDesktop } from './lib/api';
 import { buildCsv, buildJsonBackup, csvFilename, jsonBackupFilename } from './lib/csv';
 
-export type ScreenId = 'dashboard' | 'day' | 'history' | 'settings';
+export type ScreenId = 'dashboard' | 'day' | 'adjustments' | 'history' | 'settings';
 
 export interface DayTarget {
   company: CompanyId;
@@ -47,6 +49,8 @@ interface AppContextValue {
   navigate: (screen: ScreenId, target?: DayTarget | null) => void;
   saveRecord: (input: DayRecordInput) => Promise<boolean>;
   deleteRecord: (id: string) => Promise<boolean>;
+  saveAdjustment: (input: AdjustmentInput) => Promise<boolean>;
+  deleteAdjustment: (id: string) => Promise<boolean>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   replaceData: (data: unknown) => Promise<void>;
   clearAll: () => Promise<void>;
@@ -54,7 +58,14 @@ interface AppContextValue {
   dismissToast: (id: number) => void;
   exportCsv: (
     records: DayRecord[],
-    options?: { from?: string; to?: string; scopeLabel?: string },
+    adjustments: Adjustment[],
+    options?: {
+      from?: string;
+      to?: string;
+      scopeLabel?: string;
+      title?: string;
+      extraSummary?: { label: string; value: string | number }[];
+    },
   ) => Promise<void>;
   exportBackup: () => Promise<void>;
   importBackup: () => Promise<boolean>;
@@ -157,6 +168,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [notify],
   );
 
+  const saveAdjustment = useCallback(
+    async (input: AdjustmentInput) => {
+      try {
+        const next = await api.saveAdjustment(input);
+        setData(next);
+        notify('Движение добавлено', 'success');
+        return true;
+      } catch (error) {
+        notify(`Не удалось добавить движение: ${errorMessage(error)}`, 'error');
+        return false;
+      }
+    },
+    [notify],
+  );
+
+  const deleteAdjustment = useCallback(
+    async (id: string) => {
+      try {
+        const next = await api.deleteAdjustment(id);
+        setData(next);
+        notify('Движение удалено', 'success');
+        return true;
+      } catch (error) {
+        notify(`Не удалось удалить движение: ${errorMessage(error)}`, 'error');
+        return false;
+      }
+    },
+    [notify],
+  );
+
   const updateSettings = useCallback(
     async (patch: Partial<Settings>) => {
       try {
@@ -195,10 +236,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const exportCsv = useCallback(
     async (
       records: DayRecord[],
-      options: { from?: string; to?: string; scopeLabel?: string } = {},
+      adjustments: Adjustment[],
+      options: {
+        from?: string;
+        to?: string;
+        scopeLabel?: string;
+        title?: string;
+        extraSummary?: { label: string; value: string | number }[];
+      } = {},
     ) => {
       try {
-        const content = buildCsv(records, options);
+        const content = buildCsv(records, adjustments, {
+          ...options,
+          commissionRate: data.settings.commissionRate,
+        });
         const result = await api.exportFile({
           filename: csvFilename(options.from, options.to),
           content,
@@ -209,7 +260,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         notify(`Не удалось сохранить отчёт: ${errorMessage(error)}`, 'error');
       }
     },
-    [notify],
+    [data.settings.commissionRate, notify],
   );
 
   const exportBackup = useCallback(async () => {
@@ -270,6 +321,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       navigate,
       saveRecord,
       deleteRecord,
+      saveAdjustment,
+      deleteAdjustment,
       updateSettings,
       replaceData,
       clearAll,
@@ -291,6 +344,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       navigate,
       saveRecord,
       deleteRecord,
+      saveAdjustment,
+      deleteAdjustment,
       updateSettings,
       replaceData,
       clearAll,
