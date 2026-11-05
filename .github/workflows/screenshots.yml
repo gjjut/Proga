@@ -10,6 +10,7 @@ on:
       - 'index.html'
       - 'assets/**'
       - 'scripts/capture-screenshots.mjs'
+      - '.github/workflows/screenshots.yml'
 
 permissions:
   contents: write
@@ -49,9 +50,22 @@ jobs:
           npx wait-on http://127.0.0.1:4173 --timeout 60000
 
       - name: Скриншоты
-        run: node scripts/capture-screenshots.mjs
+        run: |
+          set -o pipefail
+          node scripts/capture-screenshots.mjs 2>&1 | tee screenshot.log
+
+      - name: Диагностика при ошибке
+        if: failure()
+        run: |
+          echo "Последние строки лога:"
+          tail -n 40 screenshot.log || true
+          # Публикуем хвост лога как аннотации, чтобы ошибка была видна через API.
+          tail -n 12 screenshot.log 2>/dev/null | while IFS= read -r line; do
+            echo "::error::$line"
+          done
 
       - name: Закоммитить скриншоты
+        if: success() && github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
