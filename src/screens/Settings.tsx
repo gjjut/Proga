@@ -29,18 +29,18 @@ const RELEASES_URL = `${REPO_URL}/releases`;
 
 const THEMES: { id: ThemeMode; title: string; subtitle: string; bg: string; surface: string }[] = [
   {
-    id: 'dim',
-    title: 'Dim',
-    subtitle: 'Фирменная тёмно-синяя тема X · #15202B',
-    bg: '#15202B',
-    surface: '#1E2732',
+    id: 'black',
+    title: 'Чёрная',
+    subtitle: 'Как Lights out в X: чистый чёрный и белый · #000000',
+    bg: '#000000',
+    surface: '#141619',
   },
   {
-    id: 'black',
-    title: 'Lights out',
-    subtitle: 'Полностью чёрный режим X · #000000',
-    bg: '#000000',
-    surface: '#16181C',
+    id: 'dim',
+    title: 'Графит',
+    subtitle: 'Мягкий тёмно-серый без цветных акцентов · #16181C',
+    bg: '#16181C',
+    surface: '#1C1F24',
   },
 ];
 
@@ -124,7 +124,7 @@ export function Settings() {
                 </span>
                 <span className="theme-option__text">
                   <strong>
-                    {item.id === 'dim' ? <MoonIcon size={16} /> : <SunIcon size={16} />}
+                    {item.id === 'black' ? <MoonIcon size={16} /> : <SunIcon size={16} />}
                     {item.title}
                   </strong>
                   <small>{item.subtitle}</small>

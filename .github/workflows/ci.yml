@@ -11,6 +11,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Важно: тесты должны идти не в UTC, иначе баги с часовыми поясами не видны.
+  TZ: Europe/Moscow
+
 jobs:
   checks:
     name: Типы, тесты, сборка

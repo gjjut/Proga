@@ -3,6 +3,7 @@ import {
   COMPANIES,
   companyById,
   DEFAULT_COMMISSION_RATE,
+  isIsoDate,
   type AdjustmentDirection,
   type AdjustmentTarget,
   type CompanyId,
@@ -105,6 +106,10 @@ export function Adjustments() {
   };
 
   const handleSubmit = async () => {
+    if (!isIsoDate(date)) {
+      notify('Проверьте дату: выберите день в календаре', 'error');
+      return;
+    }
     if (amountValue <= 0) {
       notify('Укажите сумму больше нуля', 'error');
       return;

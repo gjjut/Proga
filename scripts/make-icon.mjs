@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Генерирует assets/icon.png (512×512) — фирменный знак приложения:
- * скруглённый квадрат с синим градиентом X и тремя белыми восходящими полосами.
+ * скруглённый квадрат с чёрно-белым градиентом и тремя тёмными восходящими полосами.
  * Никаких зависимостей: PNG собирается вручную через zlib.
  */
 import { deflateSync } from 'node:zlib';
@@ -48,8 +48,8 @@ function distanceToSegment(px, py, x1, y1, x2, y2) {
 
 // ── 1. Фон: скруглённый квадрат с диагональным градиентом ──
 const radius = W * 0.235;
-const top = [0x24, 0xa9, 0xff];
-const bottom = [0x0a, 0x55, 0x8e];
+const top = [0xff, 0xff, 0xff];
+const bottom = [0x6f, 0x76, 0x7d];
 
 for (let y = 0; y < W; y += 1) {
   for (let x = 0; x < W; x += 1) {
@@ -62,7 +62,7 @@ for (let y = 0; y < W; y += 1) {
   }
 }
 
-// ── 2. Три белые полосы (как в BrandMark) ──
+// ── 2. Три тёмные полосы (как в BrandMark) ──
 const barWidth = W * 0.098;
 const bars = [
   { x: W * 0.298, y2: W * 0.7, y1: W * 0.545 },
@@ -81,7 +81,7 @@ for (const bar of bars) {
     for (let x = minX; x <= maxX; x += 1) {
       const distance = distanceToSegment(x + 0.5, y + 0.5, bar.x, bar.y1, bar.x, bar.y2);
       if (distance > half) continue;
-      setPixel(x, y, 255, 255, 255, 1);
+      setPixel(x, y, 0x10, 0x12, 0x15, 1);
     }
   }
 }

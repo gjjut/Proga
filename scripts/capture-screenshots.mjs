@@ -86,17 +86,17 @@ await navTo('Настройки');
 await page.waitForSelector('.theme-option');
 await shot('settings');
 
-// ── Чёрная тема ──
-// Смену темы не считаем критичной: если кнопка не нашлась, просто пропускаем кадр.
+// ── Вторая тема (графит) ──
+// Не считаем критичным: если кнопка не нашлась, просто пропускаем кадры.
 try {
-  await page.locator('.theme-option', { hasText: 'Lights out' }).first().click();
+  await page.locator('.theme-option', { hasText: 'Графит' }).first().click();
   await page.waitForTimeout(400);
-  await shot('settings-black');
+  await shot('settings-dim');
   await navTo('Главное');
   await page.waitForSelector('.hero, .empty-state', { timeout: 20000 });
-  await shot('dashboard-black');
+  await shot('dashboard-dim');
 } catch (error) {
-  console.warn('Тёмную тему снять не удалось:', error.message);
+  console.warn('Тему «Графит» снять не удалось:', error.message);
 }
 
 await browser.close();
