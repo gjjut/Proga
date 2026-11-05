@@ -73,6 +73,9 @@ jobs:
           if git diff --cached --quiet; then
             echo "Скриншоты не изменились"
           else
-            git commit -m "docs: обновлены скриншоты интерфейса [skip ci]"
+            # Без маркера [skip ci]: коммит сделан через GITHUB_TOKEN и сам по себе
+            # workflow не запускает, а маркер ломал бы релизы, если тег поставить
+            # на такой коммит (GitHub пропускает все запуски для [skip ci]).
+            git commit -m "docs: обновлены скриншоты интерфейса"
             git push
           fi
