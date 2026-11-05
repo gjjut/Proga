@@ -418,7 +418,9 @@ export function Dashboard() {
             </div>
             <div className="summary-strip__item">
               <span>Забрали</span>
-              <strong className="is-negative">{formatMoney(totals.adjustments.outTotal)}</strong>
+              <strong className={totals.adjustments.outTotal > 0 ? 'is-negative' : undefined}>
+                {formatMoney(totals.adjustments.outTotal)}
+              </strong>
             </div>
             <div className="summary-strip__item summary-strip__item--muted">
               <span>Движения по остатку</span>

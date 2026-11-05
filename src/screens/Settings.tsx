@@ -104,7 +104,7 @@ export function Settings() {
       <section className="card card--pad settings-block">
         <div className="settings-block__head">
           <h2 className="card__title">Оформление</h2>
-          <p className="card__hint">Тёмная тема включена всегда — как в X, с двумя вариантами фона</p>
+          <p className="card__hint">Чёрно-белая тема, как в X: два варианта фона, без цветных акцентов</p>
         </div>
         <div className="theme-options">
           {THEMES.map((item) => {

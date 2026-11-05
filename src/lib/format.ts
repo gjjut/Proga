@@ -27,6 +27,14 @@ export function formatMoney(value: number): string {
   return `${formatNumber(value)}${NBSP}₽`;
 }
 
+/**
+ * Сумма для строки-вычета: «−1 325,50 ₽», но у нуля — просто «0 ₽»
+ * (чтобы не появлялось «−0 ₽» и лишних выделений).
+ */
+export function formatMinusMoney(value: number): string {
+  return value > 0 ? `−${formatMoney(value)}` : formatMoney(0);
+}
+
 /** 1234.5 → «1 234,50 ₽» (два знака после запятой) */
 export function formatMoney2(value: number): string {
   return `${formatNumber2(value)}${NBSP}₽`;
