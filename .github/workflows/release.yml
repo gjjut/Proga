@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: 'Создать черновик релиза'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-windows:
+    name: Сборка Windows (.exe) и публикация релиза
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Получить код
+        uses: actions/checkout@v4
+
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Кэш Electron и electron-builder
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: ${{ runner.os }}-electron-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-
+
+      - name: Установить зависимости
+        run: npm ci
+
+      - name: Проверить соответствие тега и версии в package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "Тег: $TAG_VERSION · package.json: $PKG_VERSION"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Версия в package.json ($PKG_VERSION) не совпадает с тегом ($TAG_VERSION). Запустите npm run bump."
+            exit 1
+          fi
+
+      - name: Проверка типов
+        run: npm run typecheck
+
+      - name: Тесты
+        run: npm test
+
+      - name: Иконка приложения
+        run: npm run icon
+
+      - name: Сборка установщика и portable-версии
+        run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Заметки релиза из CHANGELOG
+        shell: bash
+        run: node scripts/changelog-section.mjs release-notes.md
+
+      - name: Сохранить артефакты сборки
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZatonFinance-windows
+          path: |
+            release/*.exe
+            release/*.blockmap
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Опубликовать GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Финансы компаний ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: |
+            release/ZatonFinance-Setup-*.exe
+            release/ZatonFinance-Portable-*.exe
+          draft: ${{ inputs.draft || false }}
+          prerelease: false
+          fail_on_unmatched_files: true
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
