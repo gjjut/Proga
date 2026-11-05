@@ -1,0 +1,64 @@
+name: Screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'index.html'
+      - 'assets/**'
+      - 'scripts/capture-screenshots.mjs'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: screenshots
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Снять скриншоты интерфейса
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Установить зависимости
+        run: npm ci
+
+      - name: Установить Chromium для Playwright
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Собрать интерфейс
+        run: npm run build:renderer
+
+      - name: Поднять превью
+        run: |
+          npx vite preview --port 4173 --host 127.0.0.1 > preview.log 2>&1 &
+          npx wait-on http://127.0.0.1:4173 --timeout 60000
+
+      - name: Скриншоты
+        run: node scripts/capture-screenshots.mjs
+
+      - name: Закоммитить скриншоты
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots
+          if git diff --cached --quiet; then
+            echo "Скриншоты не изменились"
+          else
+            git commit -m "docs: обновлены скриншоты интерфейса [skip ci]"
+            git push
+          fi
