@@ -5,6 +5,7 @@ import type { AdjustmentInput, DayRecordInput, ExportPayload, IpcResult } from '
 import type { Settings } from '../shared/model';
 import { normalizeData } from '../shared/model';
 import { DataStore } from './store';
+import { renderSplashHtml } from './splash';
 
 const APP_TITLE = 'Финансы компаний';
 const devServerUrl = process.env.VITE_DEV_SERVER_URL;
@@ -12,6 +13,13 @@ const isDev = Boolean(devServerUrl);
 
 let store: DataStore | null = null;
 let mainWindow: BrowserWindow | null = null;
+let splashWindow: BrowserWindow | null = null;
+/** Минимум, сколько заставка держится на экране — иначе она мигает и раздражает. */
+const SPLASH_MIN_MS = 1750;
+/** Окно заставки: карточка 460×300 плюс место под тень. */
+const SPLASH_SIZE = { width: 600, height: 420 };
+let splashShownAt = 0;
+let startupFinished = false;
 
 function getStore(): DataStore {
   if (!store) store = new DataStore();
@@ -99,6 +107,78 @@ function registerIpc(): void {
   });
 }
 
+/**
+ * Первый этап запуска: маленький прозрачный экран с вращающимся индикатором,
+ * который разворачивается в заставку. Живёт отдельно от главного окна.
+ */
+function createSplash(): void {
+  splashWindow = new BrowserWindow({
+    ...SPLASH_SIZE,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    focusable: false,
+    show: false,
+    title: APP_TITLE,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  splashShownAt = Date.now();
+
+  splashWindow.once('ready-to-show', () => splashWindow?.show());
+  splashWindow.on('closed', () => {
+    splashWindow = null;
+  });
+
+  const html = renderSplashHtml(app.getVersion());
+  void splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+}
+
+function showMainWindow(): void {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+/** Гасит заставку и показывает программу. Повторные вызовы игнорируются. */
+function finishStartup(): void {
+  if (startupFinished) return;
+  startupFinished = true;
+
+  const wait = Math.max(0, SPLASH_MIN_MS - (Date.now() - splashShownAt));
+  setTimeout(() => {
+    const splash = splashWindow;
+    if (!splash || splash.isDestroyed()) {
+      showMainWindow();
+      return;
+    }
+
+    void splash.webContents
+      .executeJavaScript('window.splashReady && window.splashReady();')
+      .catch(() => undefined);
+
+    // Даём карточке 280 мс на затухание, затем убираем окно и показываем программу.
+    setTimeout(() => {
+      if (!splash.isDestroyed()) splash.destroy();
+      splashWindow = null;
+      showMainWindow();
+    }, 280);
+  }, wait);
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1340,
@@ -118,7 +198,11 @@ function createWindow(): void {
     },
   });
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  // Главное окно показываем только после заставки: интерфейс уже отрисован,
+  // поэтому переход получается без белой вспышки и «прыжков» вёрстки.
+  mainWindow.once('ready-to-show', () => finishStartup());
+  // Страховка: если окно почему-то не сообщило о готовности — не держим заставку вечно.
+  setTimeout(() => finishStartup(), 12000);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
@@ -152,6 +236,7 @@ if (!gotSingleInstanceLock) {
 } else {
   app.on('second-instance', () => {
     if (!mainWindow) return;
+    if (!mainWindow.isVisible()) finishStartup();
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
   });
@@ -165,6 +250,7 @@ if (!gotSingleInstanceLock) {
     Menu.setApplicationMenu(null);
     registerIpc();
     getStore().load();
+    createSplash();
     createWindow();
 
     app.on('activate', () => {

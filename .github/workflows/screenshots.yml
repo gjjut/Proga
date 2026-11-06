@@ -42,7 +42,9 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Собрать интерфейс
-        run: npm run build:renderer
+        run: |
+          npm run build:renderer
+          npm run build:electron
 
       - name: Поднять превью
         run: |
@@ -53,6 +55,15 @@ jobs:
         run: |
           set -o pipefail
           node scripts/capture-screenshots.mjs 2>&1 | tee screenshot.log
+          node scripts/capture-splash.mjs 2>&1 | tee -a screenshot.log
+
+      - name: Сохранить скриншоты как артефакт
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: docs/screenshots
+          if-no-files-found: warn
 
       - name: Диагностика при ошибке
         if: failure()
