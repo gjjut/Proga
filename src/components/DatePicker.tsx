@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from './Icons';
-import { formatDateWithWeekday, todayIso } from '../lib/format';
+import { formatDateShort, formatDateWithWeekday, todayIso } from '../lib/format';
 
 const MONTHS = [
   'январь',
@@ -139,8 +139,11 @@ export function DatePicker({
     setOpen(false);
   };
 
+  // В крупной кнопке — «6 ноября 2026, пт», в компактном фильтре — «06.11.2026».
   const display = selected
-    ? formatDateWithWeekday(value).replace(' г.', '')
+    ? variant === 'field'
+      ? formatDateShort(value)
+      : formatDateWithWeekday(value).replace(' г.', '')
     : 'выберите дату';
 
   return (

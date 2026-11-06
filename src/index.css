@@ -2988,6 +2988,11 @@ select {
   background: var(--field-bg-focus);
 }
 
+/* Открытый календарь подсвечивает свою кнопку. */
+.date-pick__trigger[aria-expanded='true'] {
+  border-color: var(--accent);
+}
+
 .date-pick--nav .date-pick__trigger svg {
   color: var(--text-secondary);
 }
@@ -3009,6 +3014,8 @@ select {
 
 .date-pick--field .date-pick__trigger {
   font-size: 12.5px;
+  min-width: 84px;
+  justify-content: flex-start;
 }
 
 .date-pop {

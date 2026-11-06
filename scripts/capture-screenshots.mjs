@@ -99,6 +99,14 @@ try {
   await navTo('Главное');
   await page.waitForSelector('.hero, .empty-state', { timeout: 20000 });
   await shot('dashboard-light');
+
+  // Запись дня в белой теме + календарь
+  await navTo('Запись дня');
+  await page.waitForSelector('.day-bar', { timeout: 20000 });
+  await page.locator('button[aria-label="Дата записи"]').click();
+  await page.waitForSelector('.date-pop');
+  await shot('day-entry-calendar-light');
+  await page.keyboard.press('Escape');
 } catch (error) {
   console.warn('Тему «Белая» снять не удалось:', error.message);
 }
