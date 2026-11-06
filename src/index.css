@@ -1610,8 +1610,8 @@ select {
 }
 
 .summary-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 1px;
   border-radius: var(--radius-card);
   border: 1px solid var(--border);
@@ -1619,8 +1619,10 @@ select {
   background: var(--border);
 }
 
+/* flex вместо grid: при переносе не остаётся серой «дыры» от пустых колонок */
 .summary-strip__item {
   display: flex;
+  flex: 1 1 128px;
   flex-direction: column;
   gap: 3px;
   padding: 13px 16px;
