@@ -4,9 +4,11 @@ import { RevenueChart } from '../components/Chart';
 import {
   ArrowUpRightIcon,
   BanknoteIcon,
+  CheckIcon,
   ChevronRightIcon,
   CompanyMark,
   DownloadIcon,
+  InfoIcon,
   PenIcon,
   ReceiptIcon,
   RepeatIcon,
@@ -16,6 +18,7 @@ import {
 import { MoneyStat } from '../components/Stat';
 import { CompanyBadge } from '../components/Badge';
 import {
+  cashChainIssues,
   companyBreakdown,
   dailySeries,
   dayMetrics,
@@ -83,6 +86,11 @@ export function Dashboard() {
   const current = useMemo(
     () => totalsOf(data.records, data.adjustments, rate),
     [data.records, data.adjustments, rate],
+  );
+  // Цепочка наличных: «касса вчера» каждой записи должна совпадать с прошлым фактом.
+  const chainIssues = useMemo(
+    () => cashChainIssues(data.records, data.adjustments),
+    [data.records, data.adjustments],
   );
   const currentBreakdown = useMemo(
     () => companyBreakdown(data.records, data.adjustments, rate),
@@ -250,6 +258,54 @@ export function Dashboard() {
               />
             </div>
           </section>
+
+          {chainIssues.length > 0 ? (
+            <section className="balance-check balance-check--warn">
+              <div className="balance-check__head">
+                <InfoIcon size={16} />
+                <strong>Остаток наличных расходится</strong>
+                <span className="balance-check__count">{chainIssues.length}</span>
+              </div>
+              <p className="balance-check__text">
+                «Касса вчера» в записи не равна фактическому остатку прошлой записи компании.
+                Из-за этого наличные «прибавляются» или пропадают. Укажите движение в
+                «Поступлениях» (например, «забрали на счёт») или поправьте остаток в записи дня.
+              </p>
+              <ul className="balance-check__list">
+                {chainIssues.slice(0, 3).map((issue) => (
+                  <li key={`${issue.company}|${issue.date}`}>
+                    <button
+                      type="button"
+                      className="balance-check__item"
+                      onClick={() => navigate('day', { company: issue.company, date: issue.date })}
+                    >
+                      <span className="balance-check__date">
+                        {formatDateShort(issue.date)} · {companyById(issue.company).name}
+                      </span>
+                      <span className="balance-check__gap">
+                        {formatSignedMoney(issue.gap)}
+                      </span>
+                      <span className="balance-check__detail">
+                        в записи {formatMoney(issue.entered)} · ожидалось{' '}
+                        {formatMoney(issue.expected)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {chainIssues.length > 3 ? (
+                <span className="balance-check__more">и ещё {chainIssues.length - 3}</span>
+              ) : null}
+            </section>
+          ) : (
+            <div className="balance-check">
+              <CheckIcon size={14} />
+              <span>
+                Цепочка наличных сходится: остаток «вчера» в каждой записи равен факту прошлого дня,
+                деньги никуда не пропадают
+              </span>
+            </div>
+          )}
 
           <div className="company-grid">
             {breakdown.map(({ company, totals: companyStats }) => {

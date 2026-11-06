@@ -156,6 +156,16 @@ describe('Приложение целиком', () => {
     expect(container.querySelectorAll('.pots__item')).toHaveLength(3);
     expect(container.querySelectorAll('.company-card')).toHaveLength(2);
     expect(container.querySelectorAll('.chart__col').length).toBe(14);
+    // Цепочка наличных в демо сходится — предупреждения о разрыве нет.
+    expect(text).toContain('Цепочка наличных сходится');
+    expect(container.querySelector('.balance-check--warn')).toBeNull();
+  });
+
+  it('показывает остаток кассы на конец дня', async () => {
+    await navTo('Запись дня');
+    const bar = container.querySelector('.day-bar')?.textContent ?? '';
+    expect(bar).toContain('В кассе на конец дня');
+    expect(bar).toContain('Касса за день');
   });
 
   it('показывает в меню все пять разделов', () => {

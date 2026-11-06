@@ -2829,6 +2829,111 @@ select {
    Разбивка остатка: наличные / терминал / НЗ
    ══════════════════════════════════════════════════════════════ */
 
+.balance-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.balance-check svg {
+  flex: none;
+  color: var(--text-tertiary);
+}
+
+/* Расхождение цепочки наличных: спокойный ч/б акцент, без красного */
+.balance-check--warn {
+  display: block;
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.balance-check__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.balance-check__count {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--tint-strong);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.balance-check__text {
+  margin: 7px 0 10px;
+  max-width: 78ch;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.balance-check__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.balance-check__item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.balance-check__item:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.balance-check__date {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.balance-check__gap {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.balance-check__detail {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.balance-check__more {
+  display: block;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+
 .pots {
   display: flex;
   flex-direction: column;
