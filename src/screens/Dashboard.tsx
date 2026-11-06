@@ -78,6 +78,16 @@ export function Dashboard() {
     () => companyBreakdown(periodRecords, periodAdjustments, rate),
     [periodRecords, periodAdjustments, rate],
   );
+  // Остатки (где лежат деньги) — состояние на сейчас, они не зависят от периода:
+  // иначе при переключении «этот месяц / прошлый» сумма в кассе «прыгала».
+  const current = useMemo(
+    () => totalsOf(data.records, data.adjustments, rate),
+    [data.records, data.adjustments, rate],
+  );
+  const currentBreakdown = useMemo(
+    () => companyBreakdown(data.records, data.adjustments, rate),
+    [data.records, data.adjustments, rate],
+  );
   // График всегда показывает последние 14 дней, независимо от выбранного периода сводки.
   const series = useMemo(() => dailySeries(data.records, 14, today, rate), [data.records, today, rate]);
   const recent = useMemo(() => sortByDateDesc(periodRecords).slice(0, 5), [periodRecords]);
@@ -89,14 +99,14 @@ export function Dashboard() {
   const hasAnyData = data.records.length > 0 || data.adjustments.length > 0;
 
   const pots = [
-    { id: 'cash', label: 'Наличные', value: totals.pots.cash },
-    { id: 'terminal', label: 'На терминале', value: totals.pots.terminal },
-    { id: 'reserve', label: 'В НЗ', value: totals.pots.reserve },
+    { id: 'cash', label: 'Наличные', value: current.pots.cash },
+    { id: 'terminal', label: 'На терминале', value: current.pots.terminal },
+    { id: 'reserve', label: 'В НЗ', value: current.pots.reserve },
   ].map((pot) => ({
     ...pot,
     share:
-      totals.pots.total !== 0
-        ? Math.round((Math.max(0, pot.value) / Math.max(1, totals.pots.total)) * 100)
+      current.pots.total !== 0
+        ? Math.round((Math.max(0, pot.value) / Math.max(1, current.pots.total)) * 100)
         : 0,
   }));
   const potShares = pots.filter((pot) => pot.value > 0).map((pot) => ({
@@ -168,14 +178,14 @@ export function Dashboard() {
         <>
           <section className="hero card">
             <div className="hero__main">
-              <div className="hero__eyebrow">Общий остаток · {periodLabel}</div>
-              <div className={`hero__value${totals.pots.total < 0 ? ' is-negative' : ''}`}>
-                {formatNumber(totals.pots.total)}
+              <div className="hero__eyebrow">Общий остаток · на сейчас</div>
+              <div className={`hero__value${current.pots.total < 0 ? ' is-negative' : ''}`}>
+                {formatNumber(current.pots.total)}
                 <span className="hero__unit">₽</span>
               </div>
               <div className="hero__caption">
                 наличные + терминал + НЗ · свободно без НЗ{' '}
-                <strong>{formatMoney(totals.pots.free)}</strong>
+                <strong>{formatMoney(current.pots.free)}</strong>
               </div>
 
               <div className="pots">
@@ -233,16 +243,20 @@ export function Dashboard() {
                 hint={`${totals.expenseCount} строк`}
               />
               <MoneyStat
-                label="Свободно без НЗ"
-                amount={totals.pots.free}
+                label={`Заработано · ${periodLabel.toLowerCase()}`}
+                amount={totals.earned}
                 icon={<WalletIcon size={15} />}
-                hint="наличные + терминал"
+                hint="выручка − комиссия − расходы"
               />
             </div>
           </section>
 
           <div className="company-grid">
-            {breakdown.map(({ company, totals: companyStats }) => (
+            {breakdown.map(({ company, totals: companyStats }) => {
+              const nowPots =
+                currentBreakdown.find((item) => item.company.id === company.id)?.totals.pots ??
+                companyStats.pots;
+              return (
               <article
                 key={company.id}
                 className="company-card card"
@@ -261,31 +275,27 @@ export function Dashboard() {
                 <div className="company-card__main">
                   <div className="company-card__label">Общий остаток</div>
                   <div
-                    className={`company-card__value${companyStats.pots.total < 0 ? ' is-negative' : ''}`}
+                    className={`company-card__value${nowPots.total < 0 ? ' is-negative' : ''}`}
                   >
-                    {formatMoney(companyStats.pots.total)}
+                    {formatMoney(nowPots.total)}
                   </div>
                 </div>
 
                 <div className="company-card__grid">
                   <div className="mini-metric">
                     <span className="mini-metric__label">Наличные</span>
-                    <span className="mini-metric__value">{formatMoney(companyStats.pots.cash)}</span>
+                    <span className="mini-metric__value">{formatMoney(nowPots.cash)}</span>
                   </div>
                   <div className="mini-metric">
                     <span className="mini-metric__label">На терминале</span>
-                    <span className="mini-metric__value">
-                      {formatMoney(companyStats.pots.terminal)}
-                    </span>
+                    <span className="mini-metric__value">{formatMoney(nowPots.terminal)}</span>
                   </div>
                   <div className="mini-metric">
                     <span className="mini-metric__label">В НЗ</span>
-                    <span className="mini-metric__value">
-                      {formatMoney(companyStats.pots.reserve)}
-                    </span>
+                    <span className="mini-metric__value">{formatMoney(nowPots.reserve)}</span>
                   </div>
                   <div className="mini-metric">
-                    <span className="mini-metric__label">Выручка</span>
+                    <span className="mini-metric__label">Выручка · {periodLabel.toLowerCase()}</span>
                     <span className="mini-metric__value">{formatMoney(companyStats.revenue)}</span>
                   </div>
                 </div>
@@ -305,7 +315,8 @@ export function Dashboard() {
                   </button>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
 
           <section className="card">
@@ -369,11 +380,9 @@ export function Dashboard() {
                             </span>
                           </span>
                           <span
-                            className={`recent__balance${
-                              metrics.balance < 0 ? ' is-negative' : ''
-                            }`}
+                            className={`recent__balance${metrics.earned < 0 ? ' is-negative' : ''}`}
                           >
-                            {formatMoney(metrics.balance)}
+                            {formatMoney(metrics.earned)}
                           </span>
                           <span className="recent__chevron" style={{ color: companyById(record.company).accent }}>
                             <ChevronRightIcon size={16} />

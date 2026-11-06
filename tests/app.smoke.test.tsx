@@ -24,7 +24,14 @@ interface StoredData {
     reserve: number;
     expenses: { amount: number; comment: string }[];
   }[];
-  adjustments: { company: string; date: string; target: string; direction: string; amount: number }[];
+  adjustments: {
+    id: string;
+    company: string;
+    date: string;
+    target: string;
+    direction: string;
+    amount: number;
+  }[];
   settings: { theme?: string; commissionRate?: number };
 }
 
@@ -144,6 +151,7 @@ describe('Приложение целиком', () => {
     expect(text).toContain('Наличные');
     expect(text).toContain('На терминале');
     expect(text).toContain('В НЗ');
+    expect(text).toContain('Заработано');
     expect(text).toContain('Динамика выручки');
     expect(container.querySelectorAll('.pots__item')).toHaveLength(3);
     expect(container.querySelectorAll('.company-card')).toHaveLength(2);
@@ -166,7 +174,7 @@ describe('Приложение целиком', () => {
   it('сохраняет день по новой схеме и считает итог', async () => {
     await navTo('Запись дня');
     expect(container.querySelector('.day-bar')).not.toBeNull();
-    expect(container.textContent).toContain('Остаток дня');
+    expect(container.textContent).toContain('Заработано за день');
     expect(container.textContent).toContain('Касса вчера');
     expect(container.textContent).toContain('Факт в кассе');
 
@@ -196,12 +204,15 @@ describe('Приложение целиком', () => {
     });
     await settle();
 
-    // Итог дня в панели справа: 48200 + (9600 − 5000) + 3400 = 56200
+    // Панель дня: терминал 48 200, касса 9 600 − 5 000 = 4 600, НЗ 4 500, расходы 3 400.
     const summaryText = container.querySelector('.day-bar')?.textContent ?? '';
-    expect(summaryText).toContain('Остаток дня');
-    expect(summaryText).toMatch(/56\s?200/);
-    // Остаток дня: 56 200 − 1 325,50 − 4 500 = 50 374,50
-    expect(summaryText).toMatch(/50\s374,5/);
+    expect(summaryText).toContain('Заработано за день');
+    expect(summaryText).toMatch(/48\s200/);
+    // Наличная выручка 4 600 + 3 400 + 4 500 = 12 500; выручка дня 60 700;
+    // заработано 60 700 − 1 325,5 − 3 400 = 55 974,5
+    expect(summaryText).toMatch(/55\s974,5/);
+    // Раньше расходы не попадали в минус: получалось 50 374,5.
+    expect(summaryText).not.toMatch(/50\s374/);
 
     await act(async () => {
       buttonByText('Сохранить день')?.click();
@@ -273,7 +284,7 @@ describe('Приложение целиком', () => {
     await settle(150);
 
     const revenueBefore = 20000; // 20000 + (10000 − 10000)
-    const adjustmentsBefore = stored().adjustments.length;
+    const adjustmentsBefore = stored().adjustments.map((item) => item.id);
 
     await navTo('Поступления');
     expect(container.textContent).toContain('Новое движение');
@@ -295,12 +306,11 @@ describe('Приложение целиком', () => {
 
     expect(container.textContent).toContain('Движение добавлено');
     const data = stored();
-    expect(data.adjustments).toHaveLength(adjustmentsBefore + 1);
-    expect(data.adjustments[data.adjustments.length - 1]).toMatchObject({
-      target: 'cash',
-      direction: 'in',
-      amount: 15000,
-    });
+    expect(data.adjustments).toHaveLength(adjustmentsBefore.length + 1);
+    // В демо-данных уже есть движения на ту же сумму, поэтому ищем по id.
+    const added = data.adjustments.filter((item) => !adjustmentsBefore.includes(item.id));
+    expect(added).toHaveLength(1);
+    expect(added[0]).toMatchObject({ target: 'cash', direction: 'in', amount: 15000 });
 
     const record = data.records.find((item) => item.date === '2024-05-07');
     expect(record?.terminal).toBe(revenueBefore);
@@ -315,7 +325,7 @@ describe('Приложение целиком', () => {
     expect(container.querySelectorAll('.record').length).toBeGreaterThan(0);
     expect(container.textContent).toContain('Остаток вчера');
     expect(container.textContent).toContain('Факт в кассе');
-    expect(container.textContent).toContain('Остаток дня');
+    expect(container.textContent).toContain('Заработано за день');
     expect(container.textContent).toContain('Экспорт в Excel (CSV)');
     expect(container.querySelectorAll('.record__stat').length).toBeGreaterThanOrEqual(9);
   });

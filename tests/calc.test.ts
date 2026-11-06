@@ -75,16 +75,22 @@ const records: DayRecord[] = [
 ];
 
 describe('dayMetrics', () => {
-  it('считает изменение наличных, итог дня, комиссию и остаток', () => {
+  it('считает изменение наличных, выручку, комиссию и заработок', () => {
     const metrics = dayMetrics(records[0], RATE);
     expect(metrics.cashChange).toBe(-400);
     expect(metrics.expenses).toBe(3400);
-    expect(metrics.revenue).toBe(51200); // 48200 − 400 + 3400
+    // Из кассы ушли расходы и НЗ: −400 + 3400 + 4500 = 7500 продано за наличные.
+    expect(metrics.cashSales).toBe(7500);
+    expect(metrics.revenue).toBe(55700); // 48200 + 7500
     expect(metrics.commission).toBe(1325.5); // 48200 × 2,75%
-    expect(metrics.balance).toBe(45374.5); // 51200 − 1325,5 − 4500
+    // 55700 − 1325,5 − 3400 = 50974,5; то же, что 48200 − 1325,5 − 400 + 4500
+    expect(metrics.earned).toBe(50974.5);
+    expect(metrics.earned).toBe(
+      Math.round((metrics.revenue - metrics.commission - metrics.expenses) * 100) / 100,
+    );
   });
 
-  it('не вычитает расходы из фактических денег повторно', () => {
+  it('расходы не увеличивают заработок: трата уменьшает кассу, а не доход', () => {
     const withoutExpenses = dayMetrics(rec({ company: 'zaton', date: '2025-11-01', cashPrev: 10000, cashFact: 9600, terminal: 1000 }), RATE);
     const withExpenses = dayMetrics(
       rec({
@@ -97,34 +103,43 @@ describe('dayMetrics', () => {
       }),
       RATE,
     );
-    // Расход добавляется в итог дня (он был оплачен из кассы), а не вычитается из факта.
+    // Выручка растёт на сумму расхода: это восстановление наличной выручки...
     expect(withExpenses.revenue - withoutExpenses.revenue).toBe(2500);
     expect(withExpenses.cashChange).toBe(withoutExpenses.cashChange);
+    // ...и тут же вычитается, поэтому заработок от лишней траты не растёт.
+    expect(withExpenses.earned).toBe(withoutExpenses.earned);
+    // 600 выручки − 27,5 комиссии: касса за день всё равно упала на 400, это не доход.
+    expect(withExpenses.earned).toBe(572.5);
   });
 
   it('на НЗ комиссия не начисляется', () => {
     const metrics = dayMetrics(
-      rec({ company: 'zaton', date: '2025-11-01', terminal: 0, cashPrev: 0, cashFact: 0, reserve: 10000 }),
+      rec({ company: 'zaton', date: '2025-11-01', terminal: 0, cashPrev: 10000, cashFact: 0, reserve: 10000 }),
       RATE,
     );
     expect(metrics.commission).toBe(0);
-    expect(metrics.balance).toBe(-10000);
+    // НЗ — не расход: касса ушла в запас, но заработок нулевой, а не минус 10 000.
+    expect(metrics.earned).toBe(0);
+    expect(metrics.reserve).toBe(10000);
   });
 
   it('работает с нулевой ставкой', () => {
     const metrics = dayMetrics(records[1], 0);
     expect(metrics.commission).toBe(0);
-    expect(metrics.balance).toBe(42200 - 2000);
+    // выручка 44200 − расходы 1800
+    expect(metrics.earned).toBe(44200 - 1800);
   });
 });
 
 describe('totalsOf', () => {
-  it('суммирует выручку, комиссию, НЗ и остаток', () => {
+  it('суммирует выручку, комиссию, расходы, НЗ и заработок', () => {
     const totals = totalsOf(records, [], RATE);
-    expect(totals.revenue).toBe(120400);
+    expect(totals.revenue).toBe(129900);
     expect(totals.commission).toBe(2700.5);
+    expect(totals.expenses).toBe(13200);
     expect(totals.reserve).toBe(9500);
-    expect(totals.balance).toBe(108199.5);
+    // 129900 − 2700,5 − 13200
+    expect(totals.earned).toBe(113999.5);
     expect(totals.records).toBe(3);
     expect(totals.expenseCount).toBe(3);
     expect(totals.lastDate).toBe('2025-11-02');
@@ -136,20 +151,20 @@ describe('totalsOf', () => {
 
   it('считает по одной компании', () => {
     const zaton = companyTotals(records, [], 'zaton', RATE);
-    expect(zaton.revenue).toBe(93400);
+    expect(zaton.revenue).toBe(99900);
     expect(zaton.commission).toBe(2150.5);
     expect(zaton.reserve).toBe(6500);
     expect(zaton.cash).toBe(20000);
-    expect(zaton.balance).toBe(84749.5);
+    expect(zaton.earned).toBe(92549.5); // 99900 − 2150,5 − 5200
 
     const artfokus = companyTotals(records, [], 'artfokus', RATE);
-    expect(artfokus.revenue).toBe(27000);
+    expect(artfokus.revenue).toBe(30000);
     expect(artfokus.cash).toBe(4000);
-    expect(artfokus.balance).toBe(23450);
+    expect(artfokus.earned).toBe(21450); // 30000 − 550 − 8000
   });
 
   it('даёт нули на пустом наборе', () => {
-    expect(totalsOf([], [], RATE)).toMatchObject({ revenue: 0, balance: 0, cash: 0, records: 0 });
+    expect(totalsOf([], [], RATE)).toMatchObject({ revenue: 0, earned: 0, cash: 0, records: 0 });
   });
 
   it('раскладывает по компаниям в порядке COMPANIES', () => {
@@ -159,20 +174,22 @@ describe('totalsOf', () => {
 
   it('показывает отрицательный остаток', () => {
     const totals = totalsOf(
-      [rec({ company: 'zaton', date: '2025-11-03', terminal: 1000, cashPrev: 0, cashFact: 0, reserve: 9000 })],
+      // Касса за день уменьшилась на 5 000 без записи расхода — это вывод денег, а не продажа.
+      [rec({ company: 'zaton', date: '2025-11-03', terminal: 0, cashPrev: 10000, cashFact: 5000, reserve: 0 })],
       [],
       RATE,
     );
-    expect(totals.balance).toBeLessThan(0);
+    expect(totals.earned).toBeLessThan(0);
   });
 });
 
 describe('движения денег', () => {
-  it('поступление налички после последней записи увеличивает кассу и остаток', () => {
+  it('поступление налички после последней записи увеличивает кассу, но не заработок', () => {
     const adjustments = [adj({ company: 'zaton', date: '2025-11-05', target: 'cash', direction: 'in', amount: 15000 })];
     const totals = totalsOf(records, adjustments, RATE);
     expect(totals.cash).toBe(24000 + 15000);
-    expect(totals.balance).toBe(108199.5 + 15000);
+    expect(totals.earned).toBe(113999.5);
+    expect(totals.pots.total).toBe(128999.5 + 15000);
     expect(totals.adjustments.cashNet).toBe(15000);
     expect(totals.adjustments.inTotal).toBe(15000);
   });
@@ -181,7 +198,7 @@ describe('движения денег', () => {
     const adjustments = [adj({ company: 'zaton', date: '2025-11-05', target: 'cash', direction: 'out', amount: 7000 })];
     const totals = totalsOf(records, adjustments, RATE);
     expect(totals.cash).toBe(24000 - 7000);
-    expect(totals.balance).toBe(108199.5 - 7000);
+    expect(totals.pots.total).toBe(128999.5 - 7000);
     expect(totals.adjustments.outTotal).toBe(7000);
   });
 
@@ -189,7 +206,7 @@ describe('движения денег', () => {
     const adjustments = [adj({ company: 'zaton', date: '2025-11-01', target: 'cash', direction: 'in', amount: 5000 })];
     const totals = totalsOf(records, adjustments, RATE);
     expect(totals.cash).toBe(24000);
-    expect(totals.balance).toBe(108199.5);
+    expect(totals.pots.total).toBe(128999.5);
   });
 
   it('НЗ копится с учётом движений', () => {
@@ -199,7 +216,10 @@ describe('движения денег', () => {
     ];
     const totals = totalsOf(records, adjustments, RATE);
     expect(totals.reserve).toBe(9500 + 10000 - 3000);
-    expect(totals.balance).toBe(108199.5 - 10000 + 3000);
+    // НЗ — это отложенное, оно не уменьшает заработок, а переезжает в отдельный «карман».
+    expect(totals.earned).toBe(113999.5);
+    expect(totals.pots.reserve).toBe(16500);
+    expect(totals.pots.total).toBe(128999.5 + 10000 - 3000);
     expect(totals.adjustments.reserveNet).toBe(7000);
   });
 
@@ -214,7 +234,9 @@ describe('движения денег', () => {
     expect(totals.adjustments.terminalGrossNet).toBe(24000);
     // Комиссия в сводке учитывает и поступления через терминал.
     expect(totals.commission).toBe(2700.5 + 660);
-    expect(totals.balance).toBe(108199.5 + 23340);
+    // Комиссию с поступления банк действительно удержал — она уменьшает заработок.
+    expect(totals.earned).toBe(113999.5 - 660);
+    expect(totals.pots.total).toBe(128999.5 + 23340);
   });
 
   it('изъятие через терминал не облагается комиссией', () => {
@@ -229,12 +251,22 @@ describe('движения денег', () => {
     expect(totals.commission).toBe(2700.5);
   });
 
+  it('сходится: остатки = стартовая касса + заработано ± движения', () => {
+    const adjustments = [
+      adj({ company: 'zaton', date: '2025-11-05', target: 'cash', direction: 'in', amount: 15000 }),
+    ];
+    const totals = totalsOf(records, adjustments, RATE);
+    const opening = 10000 + 5000; // cashPrev первых записей обеих компаний
+    expect(opening + totals.earned + 15000).toBe(totals.pots.total);
+    expect(totals.pots.free + totals.pots.reserve).toBe(totals.pots.total);
+  });
+
   it('не меняет выручку', () => {
     const adjustments = [
       adj({ company: 'zaton', date: '2025-11-05', target: 'cash', direction: 'in', amount: 15000 }),
       adj({ company: 'zaton', date: '2025-11-05', target: 'terminal', direction: 'in', amount: 9000 }),
     ];
-    expect(totalsOf(records, adjustments, RATE).revenue).toBe(120400);
+    expect(totalsOf(records, adjustments, RATE).revenue).toBe(129900);
   });
 });
 
@@ -285,10 +317,10 @@ describe('фильтры и ряды', () => {
   it('строит ряд по итогам дня', () => {
     const series = dailySeries(records, 2, '2025-11-02', RATE);
     expect(series.map((point) => point.date)).toEqual(['2025-11-01', '2025-11-02']);
-    expect(series[0].total).toBe(51200);
-    expect(series[1].total).toBe(42200 + 27000);
-    expect(series[1].byCompany.zaton).toBe(42200);
-    expect(series[1].byCompany.artfokus).toBe(27000);
+    expect(series[0].total).toBe(55700);
+    expect(series[1].total).toBe(44200 + 30000);
+    expect(series[1].byCompany.zaton).toBe(44200);
+    expect(series[1].byCompany.artfokus).toBe(30000);
   });
 
   it('сортирует по убыванию даты', () => {
