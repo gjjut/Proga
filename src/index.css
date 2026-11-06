@@ -2952,40 +2952,155 @@ select {
   flex-wrap: wrap;
 }
 
-.date-nav__value {
+/* ── Свой календарь: триггер и выпадающая сетка в стиле приложения ── */
+
+.date-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.date-pick__trigger {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 13px;
-  border-radius: 10px;
-  border: 1px solid var(--border-strong);
-  background: var(--field-bg);
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text);
   font-size: 13.5px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   transition: border-color var(--transition), background var(--transition);
 }
 
-.date-nav__value:hover {
+.date-pick--nav .date-pick__trigger {
+  padding: 8px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--field-bg);
+}
+
+.date-pick--nav .date-pick__trigger:hover {
   border-color: var(--edge-strong);
   background: var(--field-bg-focus);
 }
 
-.date-nav__value svg {
+.date-pick--nav .date-pick__trigger svg {
   color: var(--text-secondary);
 }
 
-.date-nav__input {
+.date-pick--field {
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--tint-weak);
+  color: var(--text-secondary);
+  font-size: 12px;
+  transition: border-color var(--transition);
+}
+
+.date-pick--field:hover,
+.date-pick--field:focus-within {
+  border-color: var(--edge-strong);
+}
+
+.date-pick--field .date-pick__trigger {
+  font-size: 12.5px;
+}
+
+.date-pop {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  width: 272px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.date-pick--nav .date-pop {
+  left: auto;
+  right: 0;
+}
+
+.date-pop__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.date-pop__title {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
+}
+
+.date-pop__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.date-pop__dow {
+  padding: 4px 0;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.date-pop__day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
   padding: 0;
-  margin: -1px;
-  border: 0;
-  opacity: 0;
-  pointer-events: none;
-  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.date-pop__day:hover:not(:disabled) {
+  background: var(--tint);
+}
+
+.date-pop__day.is-today {
+  border-color: var(--border-strong);
+}
+
+.date-pop__day.is-selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.date-pop__day:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.date-pop__foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
 }
 
 /* ── Четыре денежных поля в один ряд ── */

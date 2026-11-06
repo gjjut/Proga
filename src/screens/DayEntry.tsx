@@ -9,7 +9,6 @@ import {
   type DayRecordInput,
 } from '../../shared/model';
 import {
-  CalendarIcon,
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -18,6 +17,7 @@ import {
   PlusIcon,
   TrashIcon,
 } from '../components/Icons';
+import { DatePicker } from '../components/DatePicker';
 import { MoneyInput } from '../components/MoneyInput';
 import { ConfirmDialog } from '../components/Modal';
 import {
@@ -58,7 +58,6 @@ export function DayEntry() {
     notify,
   } = useApp();
   const rate = data.settings.commissionRate;
-  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const [company, setCompany] = useState<CompanyId>(
     dayTarget?.company ?? data.settings.lastCompany,
@@ -296,37 +295,11 @@ export function DayEntry() {
             >
               <ChevronLeftIcon size={17} />
             </button>
-            <button
-              type="button"
-              className="date-nav__value"
-              onClick={() => {
-                const input = dateInputRef.current;
-                if (!input) return;
-                if (typeof input.showPicker === 'function') {
-                  try {
-                    input.showPicker();
-                    return;
-                  } catch {
-                    /* браузер не разрешил — просто фокус */
-                  }
-                }
-                input.focus();
-              }}
-            >
-              <CalendarIcon size={15} />
-              <span>{formatDateWithWeekday(date).replace(' г.', '')}</span>
-            </button>
-            <input
-              ref={dateInputRef}
-              type="date"
-              className="date-nav__input"
+            <DatePicker
               value={date}
               max={todayIso()}
-              tabIndex={-1}
-              onChange={(event) => {
-                if (event.target.value) setDate(event.target.value);
-              }}
-              aria-label="Дата записи"
+              onChange={setDate}
+              ariaLabel="Дата записи"
             />
             <button
               type="button"
