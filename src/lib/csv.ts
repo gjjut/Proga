@@ -178,10 +178,9 @@ export function buildCsv(
   lines.push(row(['Расходы', totals.expenses]));
   lines.push(row(['Заработано (итог − комиссия − расходы)', totals.earned]));
   lines.push(row(['НЗ накоплено', totals.reserve]));
-  lines.push(row(['Наличные в кассе', totals.pots.cash]));
-  lines.push(row(['На терминале (за вычетом комиссии)', totals.pots.terminal]));
+  lines.push(row(['Остаток в кассе (наличные после НЗ)', totals.pots.cash]));
+  lines.push(row(['На терминале (за вычетом комиссии) — уходит в банк, не остаток', totals.pots.terminal]));
   lines.push(row(['В НЗ', totals.pots.reserve]));
-  lines.push(row(['Остаток на сейчас (наличные после НЗ + терминал)', totals.pots.free]));
   lines.push(row(['Записей дней', totals.records]));
   lines.push(row(['Строк расходов', totals.expenseCount]));
 

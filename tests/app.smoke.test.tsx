@@ -146,21 +146,45 @@ describe('Приложение целиком', () => {
     expect(text).toContain('Главное');
     expect(text).toContain('Затон Рыбака');
     expect(text).toContain('Арт Фокус');
-    expect(text).toContain('Остаток на сейчас');
-    expect(text).toContain('Итог');
-    expect(text).toContain('Наличные');
+    expect(text).toContain('Наличные в кассе');
     expect(text).toContain('На терминале');
+    expect(text).toContain('Итог');
     expect(text).toContain('В НЗ');
     expect(text).toContain('Заработано');
     expect(text).toContain('Динамика итога');
-    // Остаток на сейчас = наличные + терминал; НЗ показывается отдельно, вне остатка.
-    expect(container.querySelectorAll('.pots__item')).toHaveLength(2);
+    // Остаток и терминал стоят рядом, но не складываются в одно число:
+    // терминал уходит в банк и остатком кассы не считается.
+    expect(container.querySelectorAll('.hero__pot')).toHaveLength(2);
+    expect(text).toContain('уходит в банк');
     expect(text).toContain('в НЗ отдельно');
+    // В карточках компаний остаток — только наличные.
+    expect(text).toContain('Остаток в кассе');
     expect(container.querySelectorAll('.company-card')).toHaveLength(2);
     expect(container.querySelectorAll('.chart__col').length).toBe(14);
     // Цепочка наличных в демо сходится — предупреждения о разрыве нет.
     expect(text).toContain('Цепочка наличных сходится');
     expect(container.querySelector('.balance-check--warn')).toBeNull();
+  });
+
+  it('держит остаток и терминал раздельно: в кассе — только наличные', () => {
+    const text = container.textContent ?? '';
+    const parse = (text: string | null) =>
+      Number((text ?? '').replace(/[^\d,.-]/g, '').replace(',', '.').replace(/^-?$/, '0'));
+    const heroPots = [...container.querySelectorAll('.hero__pot-value')];
+    expect(heroPots).toHaveLength(2);
+    const [cashHero, terminalHero] = heroPots.map((node) => parse(node.textContent));
+
+    // Остаток в кассе по двум компаниям = сумме остатков в их карточках.
+    const cards = [...container.querySelectorAll('.company-card__value')].map((node) =>
+      parse(node.textContent),
+    );
+    expect(cards).toHaveLength(2);
+    expect(Math.round(cards[0] + cards[1])).toBe(Math.round(cashHero));
+
+    // Терминал в остаток не входит: hero-наличные не равны «наличные + терминал».
+    expect(terminalHero).toBeGreaterThan(0);
+    expect(Math.round(cashHero)).not.toBe(Math.round(cashHero + terminalHero));
+    expect(text).toContain('уходит в банк · не остаток кассы');
   });
 
   it('показывает остаток кассы на конец дня', async () => {
@@ -306,7 +330,7 @@ describe('Приложение целиком', () => {
 
     await navTo('Поступления');
     expect(container.textContent).toContain('Новое движение');
-    expect(container.textContent).toContain('Влияние на свободный остаток');
+    expect(container.textContent).toContain('Влияние на остаток в кассе');
 
     const amountInput = container.querySelector<HTMLInputElement>('.adjust-form input.input--money');
     expect(amountInput).not.toBeNull();
