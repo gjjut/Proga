@@ -96,6 +96,11 @@ export function History() {
     () => totalsOf(filtered, filteredAdjustments, rate),
     [filtered, filteredAdjustments, rate],
   );
+  // Остатки не зависят от фильтров: в кассе лежит то, что есть сейчас, а не «за период».
+  const current = useMemo(
+    () => totalsOf(data.records, data.adjustments, rate),
+    [data.records, data.adjustments, rate],
+  );
   const deleteTarget = filtered.find((record) => record.id === deleteId) ?? null;
 
   const toggleExpanded = (id: string) => {
@@ -243,21 +248,27 @@ export function History() {
           <strong>{formatMoney(totals.expenses)}</strong>
         </div>
         <div className="summary-strip__item">
-          <span>Наличные</span>
-          <strong>{formatMoney(totals.pots.cash)}</strong>
+          <span>Заработано за период</span>
+          <strong className={totals.earned < 0 ? 'is-negative' : ''}>
+            {formatMoney(totals.earned)}
+          </strong>
+        </div>
+        <div className="summary-strip__item">
+          <span>Наличные сейчас</span>
+          <strong>{formatMoney(current.pots.cash)}</strong>
         </div>
         <div className="summary-strip__item">
           <span>На терминале</span>
-          <strong>{formatMoney(totals.pots.terminal)}</strong>
+          <strong>{formatMoney(current.pots.terminal)}</strong>
         </div>
         <div className="summary-strip__item">
           <span>В НЗ</span>
-          <strong>{formatMoney(totals.pots.reserve)}</strong>
+          <strong>{formatMoney(current.pots.reserve)}</strong>
         </div>
         <div className="summary-strip__item">
           <span>Общий остаток</span>
-          <strong className={totals.pots.total < 0 ? 'is-negative' : ''}>
-            {formatMoney(totals.pots.total)}
+          <strong className={current.pots.total < 0 ? 'is-negative' : ''}>
+            {formatMoney(current.pots.total)}
           </strong>
         </div>
       </section>
@@ -337,16 +348,16 @@ export function History() {
                     <strong>{formatMinusMoney(metrics.commission)}</strong>
                   </div>
                   <div className="record__stat">
-                    <span>Итог дня</span>
+                    <span>Выручка дня</span>
                     <strong>{formatMoney(metrics.revenue)}</strong>
                   </div>
                   <div className="record__stat record__stat--total">
-                    <span>Остаток дня</span>
+                    <span>Заработано за день</span>
                     <strong
-                      className={metrics.balance < 0 ? 'is-negative' : ''}
-                      style={{ color: metrics.balance < 0 ? undefined : meta.accent }}
+                      className={metrics.earned < 0 ? 'is-negative' : ''}
+                      style={{ color: metrics.earned < 0 ? undefined : meta.accent }}
                     >
-                      {formatMoney(metrics.balance)}
+                      {formatMoney(metrics.earned)}
                     </strong>
                   </div>
                 </div>

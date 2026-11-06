@@ -23,6 +23,10 @@ interface DemoProfile {
   cashShare: number;
   reserveShare: number;
   startTill: number;
+  /** Сверху этой суммы кассу «сдают на счёт» — так демо не копит миллионы в кассе. */
+  tillCap: number;
+  /** Сверху этой суммы деньги с терминала «изымают на счёт». */
+  terminalCap: number;
   expenses: { comment: string; min: number; max: number }[];
 }
 
@@ -31,9 +35,11 @@ const PROFILES: DemoProfile[] = [
     company: 'zaton',
     base: 46000,
     spread: 16000,
-    cashShare: 0.14,
+    cashShare: 0.16,
     reserveShare: 0.07,
     startTill: 18400,
+    tillCap: 30000,
+    terminalCap: 160000,
     expenses: [
       { comment: 'Закупка корма и прикормки', min: 3200, max: 9800 },
       { comment: 'Бензин для генератора', min: 1800, max: 4600 },
@@ -47,9 +53,11 @@ const PROFILES: DemoProfile[] = [
     company: 'artfokus',
     base: 28000,
     spread: 11000,
-    cashShare: 0.1,
+    cashShare: 0.12,
     reserveShare: 0.09,
     startTill: 9600,
+    tillCap: 22000,
+    terminalCap: 110000,
     expenses: [
       { comment: 'Аренда студии', min: 8000, max: 12000 },
       { comment: 'Материалы для съёмки', min: 2200, max: 7400 },
@@ -81,9 +89,11 @@ function isoShift(baseIso: string, delta: number): string {
 export function buildDemoData(todayIso: string, days = 42): AppData {
   const random = mulberry32(20260101);
   const records: DayRecord[] = [];
+  const withdrawals: Adjustment[] = [];
 
   for (const profile of PROFILES) {
     let till = profile.startTill;
+    let onTerminal = 0;
 
     for (let offset = days - 1; offset >= 0; offset -= 1) {
       const date = isoShift(todayIso, -offset);
@@ -104,11 +114,46 @@ export function buildDemoData(todayIso: string, days = 42): AppData {
       }
       const expenseSum = expenseRows.reduce((sum, expense) => sum + expense.amount, 0);
 
-      const cashSales = Math.round((terminal * profile.cashShare * (0.7 + random())) / 100) * 100;
+      const reserve = Math.round((terminal * profile.reserveShare) / 100) * 100;
       const cashPrev = round2(till);
-      // НЗ остаётся в кассе, поэтому уменьшает факт только на сумму расходов.
-      const cashFact = Math.max(0, round2(cashPrev + cashSales - expenseSum));
-      till = cashFact;
+      // Наличная выручка должна покрывать расходы и отложенное в НЗ — иначе касса уходит в ноль.
+      const plannedSales = Math.round((terminal * profile.cashShare * (0.7 + random())) / 100) * 100;
+      const cashSales = Math.max(
+        plannedSales,
+        expenseSum + reserve + 800 + Math.round((random() * 1200) / 100) * 100,
+      );
+      // НЗ лежит отдельно от кассы: из кассы уходят и расходы, и отложенное.
+      let cashFact = round2(cashPrev + cashSales - expenseSum - reserve);
+      if (cashFact > profile.tillCap) {
+        withdrawals.push({
+          id: newId(),
+          company: profile.company,
+          date,
+          target: 'cash',
+          direction: 'out',
+          amount: round2(cashFact - profile.tillCap),
+          comment: 'Сдали выручку на счёт',
+          createdAt: new Date(`${date}T20:00:00`).toISOString(),
+        });
+        cashFact = round2(profile.tillCap);
+      }
+      till = Math.max(0, cashFact);
+
+      // Деньги с терминала периодически изымают на счёт — иначе «на терминале» копится вечно.
+      onTerminal += terminal - Math.round((terminal * 2.75) / 100);
+      if (onTerminal > profile.terminalCap) {
+        withdrawals.push({
+          id: newId(),
+          company: profile.company,
+          date,
+          target: 'terminal',
+          direction: 'out',
+          amount: Math.round((onTerminal - profile.terminalCap) / 100) * 100,
+          comment: 'Изъяли с терминала на счёт',
+          createdAt: new Date(`${date}T20:00:00`).toISOString(),
+        });
+        onTerminal = profile.terminalCap;
+      }
 
       const createdAt = new Date(`${date}T19:30:00`).toISOString();
       records.push({
@@ -118,7 +163,7 @@ export function buildDemoData(todayIso: string, days = 42): AppData {
         cashPrev,
         terminal,
         cashFact,
-        reserve: Math.round((terminal * profile.reserveShare) / 100) * 100,
+        reserve,
         expenses: expenseRows,
         note:
           random() > 0.88
@@ -136,7 +181,7 @@ export function buildDemoData(todayIso: string, days = 42): AppData {
 
   // Сторонние движения денег — на дни без записей, чтобы были видны в остатках.
   const takenDates = new Set(records.map((record) => `${record.company}|${record.date}`));
-  const adjustments: Adjustment[] = [];
+  const adjustments: Adjustment[] = [...withdrawals];
 
   const addAdjustment = (
     company: CompanyId,

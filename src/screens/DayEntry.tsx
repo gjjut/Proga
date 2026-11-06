@@ -125,9 +125,13 @@ export function DayEntry() {
   const expensesValue = expenses.reduce((sum, expense) => sum + parseMoneyInput(expense.amount), 0);
 
   const cashChange = round2(factValue - prevValue);
-  const revenue = round2(terminalValue + cashChange + expensesValue);
+  // Из кассы ушли и расходы, и отложенное в НЗ — их возвращаем в наличную выручку.
+  const cashSales = round2(cashChange + expensesValue + reserveValue);
+  const revenue = round2(terminalValue + cashSales);
   const commission = commissionOf(terminalValue, rate);
-  const dayBalance = round2(revenue - commission - reserveValue);
+  // Заработано = выручка − комиссия − расходы. НЗ заработок не уменьшает:
+  // это переложенные в запас свои же деньги, они видны в остатках.
+  const dayEarned = round2(revenue - commission - expensesValue);
   const suggestDiffers = !existing && Math.abs(suggested - prevValue) > 0.005;
   const storedPrevDiffers =
     existing !== null && Math.abs(suggested - existing.cashPrev) > 0.005;
@@ -454,18 +458,28 @@ export function DayEntry() {
       <div className="day-bar">
         <div className="day-bar__stats">
           <div className="day-bar__total">
-            <span className="day-bar__label">Остаток дня</span>
-            <strong className={dayBalance < 0 ? 'is-negative' : ''}>{formatMoney(dayBalance)}</strong>
+            <span className="day-bar__label">Заработано за день</span>
+            <strong className={dayEarned < 0 ? 'is-negative' : ''}>{formatMoney(dayEarned)}</strong>
           </div>
-          <div className="day-bar__facts">
-            <span>
-              Итог дня <b>{formatMoney(revenue)}</b>
-            </span>
-            <span>
-              Комиссия <b>{formatMinusMoney(commission)}</b>
-            </span>
-            <span>
-              В НЗ <b>{formatMinusMoney(reserveValue)}</b>
+          <div className="day-bar__details">
+            <div className="day-bar__facts">
+              <span>
+                Терминал <b>{formatMoney(terminalValue)}</b>
+              </span>
+              <span>
+                Комиссия <b>{formatMinusMoney(commission)}</b>
+              </span>
+              <span>
+                Касса <b>{formatSignedMoney(cashChange)}</b>
+              </span>
+              <span>
+                В НЗ отложено <b>{formatMoney(reserveValue)}</b>
+              </span>
+            </div>
+            <span className="day-bar__note">
+              {expensesValue > 0
+                ? `Расходы ${formatMoney(expensesValue)} вычтены из кассы и из заработка; НЗ — запас, а не трата`
+                : 'НЗ — запас, а не трата: деньги остаются вашими, просто лежат отдельно'}
             </span>
           </div>
         </div>
