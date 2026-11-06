@@ -236,7 +236,7 @@ export function History() {
 
       <section className="summary-strip">
         <div className="summary-strip__item">
-          <span>Выручка</span>
+          <span>Итог</span>
           <strong>{formatMoney(totals.revenue)}</strong>
         </div>
         <div className="summary-strip__item">
@@ -266,9 +266,9 @@ export function History() {
           <strong>{formatMoney(current.pots.reserve)}</strong>
         </div>
         <div className="summary-strip__item">
-          <span>Общий остаток</span>
-          <strong className={current.pots.total < 0 ? 'is-negative' : ''}>
-            {formatMoney(current.pots.total)}
+          <span>Остаток на сейчас</span>
+          <strong className={current.pots.free < 0 ? 'is-negative' : ''}>
+            {formatMoney(current.pots.free)}
           </strong>
         </div>
       </section>
@@ -326,7 +326,7 @@ export function History() {
                     <strong>{formatMoney(record.terminal)}</strong>
                   </div>
                   <div className="record__stat">
-                    <span>Факт в кассе</span>
+                    <span>Нал вечером</span>
                     <strong>{formatMoney(record.cashFact)}</strong>
                   </div>
                   <div className="record__stat">
@@ -348,7 +348,7 @@ export function History() {
                     <strong>{formatMinusMoney(metrics.commission)}</strong>
                   </div>
                   <div className="record__stat">
-                    <span>Выручка дня</span>
+                    <span>Итог дня</span>
                     <strong>{formatMoney(metrics.revenue)}</strong>
                   </div>
                   <div className="record__stat record__stat--total">
@@ -411,7 +411,7 @@ export function History() {
             <div>
               <h2 className="card__title">Движения за период</h2>
               <p className="card__hint">
-                Поступления и изъятия не входят в выручку — только меняют остатки
+                Поступления и изъятия не входят в итог — только меняют остатки
               </p>
             </div>
             <button

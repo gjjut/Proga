@@ -23,7 +23,7 @@ interface DemoProfile {
   /** Какая доля оборота приходит наличными (нужна, чтобы касса не упиралась в ноль). */
   cashShare: number;
   reserveShare: number;
-  /** Остаток кассы, к которому возвращаются после сдачи выручки на счёт. */
+  /** Остаток кассы, к которому возвращаются после сдачи денег на счёт. */
   tillBase: number;
   /** Выше этого остатка деньги из кассы забирают на счёт. */
   tillTop: number;
@@ -123,7 +123,7 @@ export function buildDemoData(todayIso: string, days = 42): AppData {
               target: 'cash',
               direction: 'out',
               amount,
-              comment: 'Сдали выручку на счёт',
+              comment: 'Сдали деньги на счёт',
               createdAt: new Date(`${date}T12:00:00`).toISOString(),
             });
             till = round2(till - amount);
@@ -167,8 +167,9 @@ export function buildDemoData(todayIso: string, days = 42): AppData {
       const raw =
         (tight ? -1 : 1) * round100(400 + random() * (profile.base * profile.cashShare * 0.12));
       const margin = Math.max(raw, 500 - cashPrev);
-      const cashFact = round2(cashPrev + margin);
-      till = cashFact;
+      // В кассе вечером лежит и рабочий остаток, и отложенное в НЗ — так и считает хозяин.
+      const cashFact = round2(cashPrev + margin + reserve);
+      till = round2(cashPrev + margin);
 
       // Деньги с терминала периодически изымают на счёт — иначе «на терминале» копится вечно.
       onTerminal += terminal - round100((terminal * 2.75) / 100);

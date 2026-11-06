@@ -55,7 +55,7 @@ const records: DayRecord[] = [
     date: '2025-11-01',
     cashPrev: 10000,
     terminal: 48200,
-    cashFact: 9600,
+    cashFact: 14100, // весь нал вечером: 9 600 в кассе + 4 500 в НЗ
     reserve: 4500,
     expenses: [{ id: 'e1', amount: 3400, comment: 'Корм' }],
   }),
@@ -64,7 +64,7 @@ const records: DayRecord[] = [
     date: '2025-11-02',
     cashPrev: 9600,
     terminal: 30000,
-    cashFact: 20000,
+    cashFact: 22000, // 20 000 в кассе + 2 000 в НЗ
     reserve: 2000,
     expenses: [{ id: 'e2', amount: 1800, comment: 'Бензин' }],
   }),
@@ -73,7 +73,7 @@ const records: DayRecord[] = [
     date: '2025-11-02',
     cashPrev: 5000,
     terminal: 20000,
-    cashFact: 4000,
+    cashFact: 7000, // 4 000 в кассе + 3 000 в НЗ
     reserve: 3000,
     expenses: [{ id: 'e3', amount: 8000, comment: 'Аренда' }],
   }),
@@ -96,7 +96,12 @@ describe('dayMetrics', () => {
   });
 
   it('расходы не увеличивают заработок: трата уменьшает кассу, а не доход', () => {
-    const withoutExpenses = dayMetrics(rec({ company: 'zaton', date: '2025-11-01', cashPrev: 10000, cashFact: 9600, terminal: 1000 }), RATE);
+    const withoutExpenses = dayMetrics(
+      rec({ company: 'zaton', date: '2025-11-01', cashPrev: 10000, cashFact: 9600, terminal: 1000 }),
+      RATE,
+    );
+    // Тот же нал вечером, но с записанным расходом 2 500:
+    // расход добавляет сумму в итог и сразу вычитается — заработок не растёт.
     const withExpenses = dayMetrics(
       rec({
         company: 'zaton',
@@ -108,18 +113,41 @@ describe('dayMetrics', () => {
       }),
       RATE,
     );
-    // Выручка растёт на сумму расхода: это восстановление наличной выручки...
     expect(withExpenses.revenue - withoutExpenses.revenue).toBe(2500);
     expect(withExpenses.cashChange).toBe(withoutExpenses.cashChange);
-    // ...и тут же вычитается, поэтому заработок от лишней траты не растёт.
     expect(withExpenses.earned).toBe(withoutExpenses.earned);
-    // 600 выручки − 27,5 комиссии: касса за день всё равно упала на 400, это не доход.
-    expect(withExpenses.earned).toBe(572.5);
+    expect(withoutExpenses.earned).toBe(572.5);
+  });
+
+  it('пример из жизни: вчера 1 000, вечером 2 000, в НЗ отложили 500 — в кассе 1 500', () => {
+    const record = rec({
+      company: 'zaton',
+      date: '2025-11-02',
+      cashPrev: 1000,
+      cashFact: 2000,
+      reserve: 500,
+    });
+    const metrics = dayMetrics(record, RATE);
+    // Нал вечером 2 000 вместе с НЗ, поэтому в кассе остаётся 1 500.
+    expect(metrics.cashCounted).toBe(2000);
+    expect(metrics.cashBalance).toBe(1500);
+    expect(metrics.cashChange).toBe(500);
+    // Итог = нал вечером + расходы + терминал − остаток вчера = 2 000 − 1 000
+    expect(metrics.cashSales).toBe(1000);
+    expect(metrics.revenue).toBe(1000);
+
+    const totals = totalsOf([record], [], RATE);
+    expect(totals.pots.cash).toBe(1500);
+    expect(totals.pots.reserve).toBe(500);
+    // Остаток на сейчас — без НЗ, а НЗ показан отдельно.
+    expect(totals.pots.free).toBe(1500);
+    expect(totals.pots.total).toBe(2000);
   });
 
   it('на НЗ комиссия не начисляется', () => {
     const metrics = dayMetrics(
-      rec({ company: 'zaton', date: '2025-11-01', terminal: 0, cashPrev: 10000, cashFact: 0, reserve: 10000 }),
+      // Весь нал вечером 10 000, из них 10 000 отложили в НЗ — в кассе осталось 0.
+      rec({ company: 'zaton', date: '2025-11-01', terminal: 0, cashPrev: 10000, cashFact: 10000, reserve: 10000 }),
       RATE,
     );
     expect(metrics.commission).toBe(0);

@@ -148,7 +148,7 @@ export function Adjustments() {
         <div className="screen__title-wrap">
           <h1 className="screen__title">Поступления и изъятия</h1>
           <p className="screen__subtitle">
-            Сторонние движения денег · не меняют выручку и итоги дня
+            Сторонние движения денег · не меняют итог дня
           </p>
         </div>
         <div className="screen__actions">
@@ -262,7 +262,7 @@ export function Adjustments() {
                 type="text"
                 maxLength={400}
                 value={comment}
-                placeholder="Например, «внесли личные деньги» или «забрали выручку»"
+                placeholder="Например, «внесли личные деньги» или «забрали на счёт»"
                 onChange={(event) => setComment(event.target.value)}
               />
             </label>
@@ -429,7 +429,7 @@ export function Adjustments() {
       </section>
 
       <p className="screen__note">
-        Движения не попадают в выручку и итоги дня — они меняют только остатки на главном экране.{' '}
+        Движения не попадают в итог дня — они меняют только остатки на главном экране.{' '}
         <button type="button" className="link-btn" onClick={() => navigate('dashboard')}>
           К сводке
           <ChevronRightIcon size={14} />
