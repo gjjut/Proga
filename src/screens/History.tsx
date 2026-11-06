@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { COMPANIES, companyById, type CompanyId, type DayRecord } from '../../shared/model';
 import { CompanyBadge } from '../components/Badge';
+import { DatePicker } from '../components/DatePicker';
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -189,32 +190,26 @@ export function History() {
             ))}
           </div>
           <div className="date-range">
-            <label className="date-field date-field--small">
-              <span>с</span>
-              <input
-                type="date"
-                className="date-field__input"
-                value={from}
-                onChange={(event) => {
-                  setFrom(event.target.value);
-                  setPreset('custom');
-                }}
-                aria-label="Дата с"
-              />
-            </label>
-            <label className="date-field date-field--small">
-              <span>по</span>
-              <input
-                type="date"
-                className="date-field__input"
-                value={to}
-                onChange={(event) => {
-                  setTo(event.target.value);
-                  setPreset('custom');
-                }}
-                aria-label="Дата по"
-              />
-            </label>
+            <DatePicker
+              variant="field"
+              label="с"
+              value={from}
+              onChange={(value) => {
+                setFrom(value);
+                setPreset('custom');
+              }}
+              ariaLabel="Дата с"
+            />
+            <DatePicker
+              variant="field"
+              label="по"
+              value={to}
+              onChange={(value) => {
+                setTo(value);
+                setPreset('custom');
+              }}
+              ariaLabel="Дата по"
+            />
           </div>
         </div>
 

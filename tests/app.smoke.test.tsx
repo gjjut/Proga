@@ -45,6 +45,51 @@ function buttonByText(text: string): HTMLButtonElement | undefined {
   );
 }
 
+const MONTHS_RU = [
+  'январь',
+  'февраль',
+  'март',
+  'апрель',
+  'май',
+  'июнь',
+  'июль',
+  'август',
+  'сентябрь',
+  'октябрь',
+  'ноябрь',
+  'декабрь',
+];
+
+/** Выбрать дату через встроенный календарь: открыть, долистать месяц, кликнуть день. */
+async function pickDate(iso: string) {
+  const [year, month] = iso.split('-').map(Number);
+  await act(async () => {
+    container.querySelector<HTMLButtonElement>('button[aria-label="Дата записи"]')?.click();
+  });
+  await settle(10);
+
+  const now = new Date();
+  let shift = (now.getFullYear() - year) * 12 + (now.getMonth() + 1 - month);
+  while (shift !== 0) {
+    const label = shift > 0 ? 'Предыдущий месяц' : 'Следующий месяц';
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.click();
+    });
+    shift += shift > 0 ? -1 : 1;
+  }
+
+  expect(container.querySelector('.date-pop__title')?.textContent ?? '').toContain(
+    `${MONTHS_RU[month - 1]} `,
+  );
+
+  await act(async () => {
+    container.querySelector<HTMLButtonElement>(`button[data-date="${iso}"]`)?.click();
+  });
+  await settle(20);
+
+  expect(container.querySelector('.date-pop')).toBeNull();
+}
+
 function moneyByLabel(label: string): HTMLInputElement | null {
   return container.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
 }
@@ -125,10 +170,7 @@ describe('Приложение целиком', () => {
     expect(container.textContent).toContain('Касса вчера');
     expect(container.textContent).toContain('Факт в кассе');
 
-    const dateInput = container.querySelector<HTMLInputElement>('input[type="date"]');
-    expect(dateInput).not.toBeNull();
-    if (dateInput) setInputValue(dateInput, '2024-05-06');
-    await settle();
+    await pickDate('2024-05-06');
 
     const prevInput = moneyByLabel('Остаток наличных предыдущего дня');
     const terminalInput = moneyByLabel('Сумма по терминалу');
@@ -176,11 +218,46 @@ describe('Приложение целиком', () => {
     expect(saved?.expenses[0]).toMatchObject({ amount: 3400, comment: 'Корм для рыбалки' });
   });
 
+  it('открывает свой календарь в стиле приложения и выбирает день', async () => {
+    await navTo('Запись дня');
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Дата записи"]')?.click();
+    });
+    await settle(20);
+
+    const popover = container.querySelector('.date-pop');
+    expect(popover).not.toBeNull();
+    expect(popover?.getAttribute('role')).toBe('dialog');
+    expect(container.querySelectorAll('.date-pop__dow')).toHaveLength(7);
+
+    const todayCell = container.querySelector<HTMLButtonElement>('.date-pop__day.is-today');
+    expect(todayCell).not.toBeNull();
+    await act(async () => {
+      todayCell?.click();
+    });
+    await settle(20);
+
+    expect(container.querySelector('.date-pop')).toBeNull();
+  });
+
+  it('в фильтрах истории тот же календарь', async () => {
+    await navTo('История');
+
+    const trigger = container.querySelector<HTMLButtonElement>('button[aria-label="Дата с"]');
+    expect(trigger).not.toBeNull();
+    await act(async () => {
+      trigger?.click();
+    });
+    await settle(20);
+
+    expect(container.querySelector('.date-pop')).not.toBeNull();
+    expect(container.querySelectorAll('.date-pop__day').length).toBeGreaterThan(27);
+  });
+
   it('добавляет движение денег, не меняя выручку', async () => {
     await navTo('Запись дня');
-    const dateInput = container.querySelector<HTMLInputElement>('input[type="date"]');
-    if (dateInput) setInputValue(dateInput, '2024-05-07');
-    await settle();
+    await pickDate('2024-05-07');
     const prevInput = moneyByLabel('Остаток наличных предыдущего дня');
     const terminalInput = moneyByLabel('Сумма по терминалу');
     const factInput = moneyByLabel('Фактическое наличие наличных в кассе');

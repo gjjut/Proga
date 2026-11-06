@@ -66,6 +66,12 @@ await fill(page.locator('.expense-row__comment').nth(1), 'Бензин для г
 await page.locator('.screen__title').click();
 await shot('day-entry');
 
+// ── Свой календарь ──
+await page.locator('button[aria-label="Дата записи"]').click();
+await page.waitForSelector('.date-pop');
+await shot('day-entry-calendar');
+await page.keyboard.press('Escape');
+
 // ── Поступления и изъятия ──
 await navTo('Поступления');
 await page.waitForSelector('.adjust-form');
