@@ -373,7 +373,7 @@ export function DayEntry() {
               ariaLabel="Фактическое наличие наличных в кассе"
             />
             <span className="field__hint">
-              весь нал вечером, с НЗ · в кассе после НЗ{' '}
+              с НЗ · в кассе{' '}
               <b className={`cash-delta${cashChange < 0 ? ' is-negative' : ''}`}>
                 {formatMoney(cashBalance)}
               </b>
@@ -390,7 +390,7 @@ export function DayEntry() {
               }}
               ariaLabel="Сумма, положенная в НЗ"
             />
-            <span className="field__hint">отложили из этого нала · без комиссии</span>
+            <span className="field__hint">из этого нала · без комиссии</span>
           </label>
         </div>
 
