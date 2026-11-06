@@ -60,7 +60,7 @@ await fill(page.locator('input[aria-label="Сумма, положенная в �
 await fill(page.locator('.expense-row__amount input').first(), '3400');
 await fill(page.locator('.expense-row__comment').first(), 'Корм и прикормка, база на Ленина');
 
-await page.getByRole('button', { name: 'Добавить расход' }).click();
+await page.locator('.day-sheet__expenses .sheet-head .btn').click();
 await fill(page.locator('.expense-row__amount input').nth(1), '1800');
 await fill(page.locator('.expense-row__comment').nth(1), 'Бензин для генератора');
 await page.locator('.screen__title').click();
