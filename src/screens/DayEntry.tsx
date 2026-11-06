@@ -14,7 +14,6 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ClockIcon,
-  InfoIcon,
   PenIcon,
   PlusIcon,
   TrashIcon,
@@ -59,6 +58,7 @@ export function DayEntry() {
     notify,
   } = useApp();
   const rate = data.settings.commissionRate;
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const [company, setCompany] = useState<CompanyId>(
     dayTarget?.company ?? data.settings.lastCompany,
@@ -248,7 +248,7 @@ export function DayEntry() {
         <div className="screen__title-wrap">
           <h1 className="screen__title">Запись дня</h1>
           <p className="screen__subtitle">
-            {formatDateWithWeekday(date)} · {companyMeta.name}
+            {companyMeta.name} · {isToday ? 'сегодня' : formatDateWithWeekday(date)}
           </p>
         </div>
         <div className="screen__actions">
@@ -260,345 +260,267 @@ export function DayEntry() {
         </div>
       </header>
 
-      <div className="day-layout">
-        <div className="day-form">
-          {/* ── Шаг 1: компания и дата ── */}
-          <section className="card card--pad step">
-            <div className="step__head">
-              <span className="step__num">1</span>
-              <div className="step__titles">
-                <h2 className="step__title">Компания и дата</h2>
-                <p className="step__hint">Одна запись на день для каждой компании</p>
-              </div>
-            </div>
-
-            <div className="step__body">
-              <div className="company-picker company-picker--tight">
-                {COMPANIES.map((item) => {
-                  const active = company === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={`company-option company-option--sm${active ? ' is-active' : ''}`}
-                      style={{ ['--option-accent' as string]: item.accent }}
-                      onClick={() => setCompany(item.id)}
-                      aria-pressed={active}
-                    >
-                      <span className="company-option__dot" style={{ background: item.accent }} />
-                      <span className="company-option__text">
-                        <strong>{item.name}</strong>
-                      </span>
-                      <span className="company-option__check">
-                        {active ? <CheckIcon size={16} /> : null}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="date-row">
+      <section className="card day-sheet">
+        {/* Компания и дата — одна строка */}
+        <div className="day-sheet__top">
+          <div className="company-picker company-picker--compact">
+            {COMPANIES.map((item) => {
+              const active = company === item.id;
+              return (
                 <button
+                  key={item.id}
                   type="button"
-                  className="btn btn--icon btn--ghost"
-                  onClick={() => setDate(addDays(date, -1))}
-                  aria-label="Предыдущий день"
+                  className={`company-option company-option--sm${active ? ' is-active' : ''}`}
+                  style={{ ['--option-accent' as string]: item.accent }}
+                  onClick={() => setCompany(item.id)}
+                  aria-pressed={active}
                 >
-                  <ChevronLeftIcon size={18} />
-                </button>
-                <label className="date-field">
-                  <CalendarIcon size={17} />
-                  <input
-                    type="date"
-                    className="date-field__input"
-                    value={date}
-                    max={todayIso()}
-                    onChange={(event) => {
-                      if (event.target.value) setDate(event.target.value);
-                    }}
-                    aria-label="Дата записи"
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="btn btn--icon btn--ghost"
-                  onClick={() => setDate(addDays(date, 1))}
-                  disabled={isToday}
-                  aria-label="Следующий день"
-                >
-                  <ChevronRightIcon size={18} />
-                </button>
-                <button
-                  type="button"
-                  className={`chip${isToday ? ' is-active' : ''}`}
-                  onClick={() => setDate(todayIso())}
-                >
-                  Сегодня
-                </button>
-              </div>
-            </div>
-          </section>
-
-          {/* ── Шаг 2: деньги ── */}
-          <section className="card card--pad step">
-            <div className="step__head">
-              <span className="step__num">2</span>
-              <div className="step__titles">
-                <h2 className="step__title">Деньги за день</h2>
-                <p className="step__hint">Итог дня = терминал + изменение наличных + расходы</p>
-              </div>
-            </div>
-
-            <div className="money-block">
-              <label className="field">
-                <span className="field__label">Терминал</span>
-                <MoneyInput
-                  value={terminal}
-                  onChange={(value) => {
-                    setTerminal(value);
-                    setDirty(true);
-                  }}
-                  large
-                  ariaLabel="Сумма по терминалу"
-                />
-                <span className="field__hint">
-                  Комиссия банка {formatPercent(rate)}:{' '}
-                  <strong>{formatMinusMoney(commission)}</strong>
-                </span>
-              </label>
-
-              <label className="field">
-                <span className="field__label">В НЗ</span>
-                <MoneyInput
-                  value={reserve}
-                  onChange={(value) => {
-                    setReserve(value);
-                    setDirty(true);
-                  }}
-                  large
-                  ariaLabel="Сумма, положенная в НЗ"
-                />
-                <span className="field__hint">Без комиссии, просто откладываем</span>
-              </label>
-            </div>
-
-            <div className="cash-block">
-              <div className="cash-block__head">
-                <span className="field__label">Наличные в кассе</span>
-                <span
-                  className={`cash-delta${
-                    cashChange === 0 ? '' : cashChange < 0 ? ' is-negative' : ' is-positive'
-                  }`}
-                >
-                  {formatSignedMoney(cashChange)}
-                </span>
-              </div>
-
-              <div className="cash-flow">
-                <label className="field">
-                  <span className="field__label field__label--small">Было вчера</span>
-                  <MoneyInput
-                    value={cashPrev}
-                    onChange={(value) => {
-                      setCashPrev(value);
-                      setDirty(true);
-                    }}
-                    ariaLabel="Остаток наличных предыдущего дня"
-                  />
-                  <span className="field__hint">
-                    {suggestDiffers || storedPrevDiffers ? (
-                      <button type="button" className="suggest-link" onClick={fillSuggestedPrev}>
-                        Подставить {formatMoney(suggested)}
-                      </button>
-                    ) : (
-                      'Из предыдущей записи'
-                    )}
+                  <span className="company-option__dot" style={{ background: item.accent }} />
+                  <span className="company-option__text">
+                    <strong>{item.name}</strong>
                   </span>
-                </label>
+                  <span className="company-option__check">
+                    {active ? <CheckIcon size={16} /> : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-                <span className="cash-flow__arrow" aria-hidden="true">
-                  <ChevronRightIcon size={18} />
-                </span>
-
-                <label className="field">
-                  <span className="field__label field__label--small">Стало (факт)</span>
-                  <MoneyInput
-                    value={cashFact}
-                    onChange={(value) => {
-                      setCashFact(value);
-                      setDirty(true);
-                    }}
-                    ariaLabel="Фактическое наличие наличных в кассе"
-                  />
-                  <span className="field__hint">Сколько реально лежит в кассе</span>
-                </label>
-              </div>
-            </div>
-          </section>
-
-          {/* ── Шаг 3: расходы ── */}
-          <section className="card card--pad step">
-            <div className="step__head">
-              <span className="step__num">3</span>
-              <div className="step__titles">
-                <h2 className="step__title">Расходы</h2>
-                <p className="step__hint">Из факта кассы не вычитаются — деньги уже ушли</p>
-              </div>
-              <span className="step__sum">{formatMoney(expensesValue)}</span>
-            </div>
-
-            <div className="expense-list">
-              {expenses.map((expense, index) => (
-                <div className="expense-row" key={expense.key}>
-                  <span className="expense-row__index">{index + 1}</span>
-                  <div className="expense-row__amount">
-                    <MoneyInput
-                      value={expense.amount}
-                      onChange={(value) => patchExpense(expense.key, { amount: value })}
-                      ariaLabel={`Сумма расхода ${index + 1}`}
-                    />
-                  </div>
-                  <input
-                    className="input expense-row__comment"
-                    type="text"
-                    value={expense.comment}
-                    maxLength={400}
-                    placeholder="На что и куда"
-                    aria-label={`Комментарий к расходу ${index + 1}`}
-                    onChange={(event) => patchExpense(expense.key, { comment: event.target.value })}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn--icon btn--ghost btn--danger-hover"
-                    onClick={() => removeExpense(expense.key)}
-                    aria-label={`Удалить расход ${index + 1}`}
-                  >
-                    <TrashIcon size={17} />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <button type="button" className="btn btn--ghost btn--sm add-expense" onClick={addExpense}>
-              <PlusIcon size={16} />
-              <span>Добавить расход</span>
-            </button>
-          </section>
-
-          {/* ── Шаг 4: комментарий ── */}
-          <section className="card card--pad step">
-            <div className="step__head">
-              <span className="step__num">4</span>
-              <div className="step__titles">
-                <h2 className="step__title">Комментарий</h2>
-                <p className="step__hint">Необязательно</p>
-              </div>
-            </div>
-            <textarea
-              className="input textarea"
-              value={note}
-              maxLength={1000}
-              rows={2}
-              placeholder="Важные детали дня"
-              aria-label="Комментарий к дню"
-              onChange={(event) => {
-                setNote(event.target.value);
-                setDirty(true);
-              }}
-            />
-          </section>
-
-          <div className="day-actions">
+          <div className="date-nav">
             <button
               type="button"
-              className="btn btn--primary btn--lg"
-              onClick={() => void handleSave()}
-              disabled={saving}
+              className="btn btn--icon btn--ghost btn--sm"
+              onClick={() => setDate(addDays(date, -1))}
+              aria-label="Предыдущий день"
             >
-              <PenIcon size={18} />
-              <span>{existing ? 'Обновить запись' : 'Сохранить день'}</span>
+              <ChevronLeftIcon size={17} />
             </button>
-            <button type="button" className="btn btn--ghost" onClick={resetForm}>
-              Сбросить
+            <button
+              type="button"
+              className="date-nav__value"
+              onClick={() => {
+                const input = dateInputRef.current;
+                if (!input) return;
+                if (typeof input.showPicker === 'function') {
+                  try {
+                    input.showPicker();
+                    return;
+                  } catch {
+                    /* браузер не разрешил — просто фокус */
+                  }
+                }
+                input.focus();
+              }}
+            >
+              <CalendarIcon size={15} />
+              <span>{formatDateWithWeekday(date)}</span>
             </button>
-            {existing ? (
-              <button
-                type="button"
-                className="btn btn--ghost btn--danger-hover"
-                onClick={() => setConfirmDelete(true)}
-              >
-                <TrashIcon size={17} />
-                <span>Удалить</span>
+            <input
+              ref={dateInputRef}
+              type="date"
+              className="date-nav__input"
+              value={date}
+              max={todayIso()}
+              tabIndex={-1}
+              onChange={(event) => {
+                if (event.target.value) setDate(event.target.value);
+              }}
+              aria-label="Дата записи"
+            />
+            <button
+              type="button"
+              className="btn btn--icon btn--ghost btn--sm"
+              onClick={() => setDate(addDays(date, 1))}
+              disabled={isToday}
+              aria-label="Следующий день"
+            >
+              <ChevronRightIcon size={17} />
+            </button>
+            {!isToday ? (
+              <button type="button" className="chip" onClick={() => setDate(todayIso())}>
+                Сегодня
               </button>
-            ) : null}
-            {existing ? (
-              <span className="day-actions__note">
-                Запись за {formatDateWithWeekday(existing.date)} уже есть — сохранение обновит её
-              </span>
             ) : null}
           </div>
         </div>
 
-        <aside className="day-summary card">
-          <div className="day-summary__head">
-            <h2 className="day-summary__title">Итог дня</h2>
-            <span
-              className="company-badge"
-              style={{
-                color: companyMeta.accent,
-                borderColor: `color-mix(in srgb, ${companyMeta.accent} 30%, transparent)`,
-                background: `color-mix(in srgb, ${companyMeta.accent} 10%, transparent)`,
+        {/* Четыре поля в один ряд: слева направо — как идут деньги за день */}
+        <div className="day-sheet__money">
+          <label className="field">
+            <span className="field__label">Терминал</span>
+            <MoneyInput
+              value={terminal}
+              onChange={(value) => {
+                setTerminal(value);
+                setDirty(true);
               }}
+              ariaLabel="Сумма по терминалу"
+            />
+            <span className="field__hint">
+              комиссия {formatPercent(rate)} → {formatMinusMoney(commission)}
+            </span>
+          </label>
+
+          <label className="field">
+            <span className="field__label">Касса вчера</span>
+            <MoneyInput
+              value={cashPrev}
+              onChange={(value) => {
+                setCashPrev(value);
+                setDirty(true);
+              }}
+              ariaLabel="Остаток наличных предыдущего дня"
+            />
+            <span className="field__hint">
+              {suggestDiffers || storedPrevDiffers ? (
+                <button type="button" className="suggest-link" onClick={fillSuggestedPrev}>
+                  Подставить {formatMoney(suggested)}
+                </button>
+              ) : (
+                'из прошлой записи'
+              )}
+            </span>
+          </label>
+
+          <label className="field">
+            <span className="field__label">Факт в кассе</span>
+            <MoneyInput
+              value={cashFact}
+              onChange={(value) => {
+                setCashFact(value);
+                setDirty(true);
+              }}
+              ariaLabel="Фактическое наличие наличных в кассе"
+            />
+            <span className="field__hint">
+              изменение{' '}
+              <b className={`cash-delta${cashChange < 0 ? ' is-negative' : ''}`}>
+                {formatSignedMoney(cashChange)}
+              </b>
+            </span>
+          </label>
+
+          <label className="field">
+            <span className="field__label">В НЗ</span>
+            <MoneyInput
+              value={reserve}
+              onChange={(value) => {
+                setReserve(value);
+                setDirty(true);
+              }}
+              ariaLabel="Сумма, положенная в НЗ"
+            />
+            <span className="field__hint">без комиссии</span>
+          </label>
+        </div>
+
+        {/* Расходы */}
+        <div className="day-sheet__expenses">
+          <div className="sheet-head">
+            <h2 className="sheet-head__title">Расходы</h2>
+            <span className="sheet-head__sum">{formatMoney(expensesValue)}</span>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={addExpense}>
+              <PlusIcon size={15} />
+              <span>Добавить</span>
+            </button>
+          </div>
+
+          <div className="expense-list">
+            {expenses.map((expense, index) => (
+              <div className="expense-row" key={expense.key}>
+                <span className="expense-row__index">{index + 1}</span>
+                <div className="expense-row__amount">
+                  <MoneyInput
+                    value={expense.amount}
+                    onChange={(value) => patchExpense(expense.key, { amount: value })}
+                    ariaLabel={`Сумма расхода ${index + 1}`}
+                  />
+                </div>
+                <input
+                  className="input expense-row__comment"
+                  type="text"
+                  value={expense.comment}
+                  maxLength={400}
+                  placeholder="На что и куда"
+                  aria-label={`Комментарий к расходу ${index + 1}`}
+                  onChange={(event) => patchExpense(expense.key, { comment: event.target.value })}
+                />
+                <button
+                  type="button"
+                  className="btn btn--icon btn--ghost btn--danger-hover"
+                  onClick={() => removeExpense(expense.key)}
+                  aria-label={`Удалить расход ${index + 1}`}
+                >
+                  <TrashIcon size={17} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Комментарий */}
+        <label className="sheet-note">
+          <span className="field__label">Комментарий</span>
+          <textarea
+            className="input textarea"
+            value={note}
+            maxLength={1000}
+            rows={2}
+            placeholder="Необязательно: важные детали дня"
+            aria-label="Комментарий к дню"
+            onChange={(event) => {
+              setNote(event.target.value);
+              setDirty(true);
+            }}
+          />
+        </label>
+      </section>
+
+      {/* Панель действий: всегда внизу экрана, итоги и кнопки в одном месте */}
+      <div className="day-bar">
+        <div className="day-bar__stats">
+          <div className="day-bar__total">
+            <span className="day-bar__label">Остаток дня</span>
+            <strong className={dayBalance < 0 ? 'is-negative' : ''}>{formatMoney(dayBalance)}</strong>
+          </div>
+          <div className="day-bar__facts">
+            <span>
+              Итог дня <b>{formatMoney(revenue)}</b>
+            </span>
+            <span>
+              Комиссия <b>{formatMinusMoney(commission)}</b>
+            </span>
+            <span>
+              В НЗ <b>{formatMinusMoney(reserveValue)}</b>
+            </span>
+          </div>
+        </div>
+
+        <div className="day-bar__actions">
+          {existing ? (
+            <button
+              type="button"
+              className="btn btn--ghost btn--danger-hover"
+              onClick={() => setConfirmDelete(true)}
             >
-              {companyMeta.name}
-            </span>
-          </div>
-
-          <div className="day-summary__main">
-            <span className="day-summary__label">Остаток дня</span>
-            <span className={`day-summary__value${dayBalance < 0 ? ' is-negative' : ''}`}>
-              {formatMoney(dayBalance)}
-            </span>
-            <span className="day-summary__caption">итог дня − комиссия − НЗ</span>
-          </div>
-
-          <div className="day-summary__rows">
-            <div className="summary-row">
-              <span>Итог дня</span>
-              <strong>{formatMoney(revenue)}</strong>
-            </div>
-            <div className="summary-row">
-              <span>Комиссия банка</span>
-              <strong>{formatMinusMoney(commission)}</strong>
-            </div>
-            <div className="summary-row">
-              <span>В НЗ</span>
-              <strong>{formatMinusMoney(reserveValue)}</strong>
-            </div>
-          </div>
-
-          <div className="summary-chips">
-            <span className="summary-chip">
-              Терминал <b>{formatMoney(terminalValue)}</b>
-            </span>
-            <span className="summary-chip">
-              Касса <b>{formatMoney(factValue)}</b>
-            </span>
-            <span className="summary-chip">
-              Расходы <b>{formatMoney(expensesValue)}</b>
-            </span>
-          </div>
-
-          <div className="day-summary__hint">
-            <InfoIcon size={15} />
-            <span>Расходы уже учтены в факте кассы, комиссия — только с терминала.</span>
-          </div>
-
-          <button type="button" className="btn btn--ghost btn--block" onClick={() => navigate('dashboard')}>
-            К сводке
-            <ChevronRightIcon size={16} />
+              <TrashIcon size={17} />
+              <span>Удалить</span>
+            </button>
+          ) : null}
+          <button type="button" className="btn btn--ghost" onClick={resetForm}>
+            Сбросить
           </button>
-        </aside>
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={() => void handleSave()}
+            disabled={saving}
+          >
+            <PenIcon size={17} />
+            <span>{existing ? 'Обновить запись' : 'Сохранить день'}</span>
+          </button>
+        </div>
       </div>
 
       <ConfirmDialog

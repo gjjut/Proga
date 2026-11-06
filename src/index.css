@@ -761,7 +761,7 @@ select {
 /* У крупных чисел подчёркивание выглядит шумно — минус виден по знаку. */
 .hero__value.is-negative,
 .company-card__value.is-negative,
-.day-summary__value.is-negative,
+.day-bar__total strong.is-negative,
 .stat__value.is-negative {
   text-decoration: none;
 }
@@ -1213,13 +1213,6 @@ select {
 
 /* ───────────────────────── Формы ───────────────────────── */
 
-.day-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 336px;
-  gap: 16px;
-  align-items: start;
-}
-
 .form-block + .form-block {
   margin-top: 24px;
   padding-top: 22px;
@@ -1545,110 +1538,7 @@ select {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--pink);
-}
-
-/* ───────────────────────── Итоги дня ───────────────────────── */
-
-.day-summary {
-  position: sticky;
-  top: 20px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background:
-    radial-gradient(120% 120% at 100% 0%, var(--tint), transparent 55%),
-    var(--surface);
-  border-color: var(--border-strong);
-}
-
-.day-summary__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.day-summary__title {
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.day-summary__main {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 16px;
-  border-radius: 13px;
-  background: var(--field-bg);
-  border: 1px solid var(--border);
-}
-
-.day-summary__label {
-  font-size: 11.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-secondary);
-  font-weight: 700;
-}
-
-.day-summary__value {
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-
-.day-summary__caption {
-  font-size: 11.5px;
-  color: var(--text-tertiary);
-}
-
-.day-summary__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--border);
-  border: 1px solid var(--border);
-}
-
-.summary-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 13px;
-  background: var(--surface);
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.summary-row strong {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-.summary-row span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.summary-row--muted {
-  color: var(--text-tertiary);
-}
-
-.day-summary__hint {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  line-height: 1.5;
+  background: var(--text);
 }
 
 /* ───────────────────────── Фильтры истории ───────────────────────── */
@@ -2300,7 +2190,7 @@ select {
 }
 
 .toast--success .toast__icon {
-  color: var(--success);
+  color: var(--text);
 }
 
 .toast--error {
@@ -2445,13 +2335,6 @@ select {
     padding: 0 22px 56px;
   }
 
-  .day-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .day-summary {
-    position: static;
-  }
 }
 
 @media (max-width: 980px) {
@@ -2557,7 +2440,7 @@ select {
    ══════════════════════════════════════════════════════════════ */
 
 .is-positive {
-  color: var(--success);
+  color: var(--text);
 }
 
 /* ── Две колонки на главном ── */
@@ -2913,19 +2796,6 @@ select {
   color: var(--text-secondary);
 }
 
-/* ── Итоги дня: подсказка с иконкой ── */
-.day-summary__hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.day-summary__hint svg {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: var(--text-tertiary);
-}
-
 @media (max-width: 1100px) {
   .dashboard-columns {
     grid-template-columns: minmax(0, 1fr);
@@ -3044,267 +2914,258 @@ select {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Запись дня: пошаговая раскладка
+   Запись дня: один лист + панель действий
    ══════════════════════════════════════════════════════════════ */
 
-.day-form {
+.day-sheet {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  min-width: 0;
+  gap: 16px;
+  padding: 18px 20px 20px;
 }
 
-.step {
-  padding: 20px;
-}
-
-.step__head {
+.day-sheet__top {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.step__num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1px solid var(--border-strong);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.step__titles {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.step__title {
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.step__hint {
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--text-tertiary);
-}
-
-.step__sum {
-  margin-left: auto;
-  font-size: 14px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.step__body {
-  display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-}
-
-.company-picker--tight {
-  display: flex;
   flex-wrap: wrap;
+}
+
+/* ── Дата: своя подпись «5 ноября 2026, чт» + нативный календарь по клику ── */
+
+.date-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.date-nav__value {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
-  flex: 1 1 300px;
+  padding: 8px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--field-bg);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: border-color var(--transition), background var(--transition);
 }
 
-.company-option--sm {
-  padding: 9px 12px;
-  gap: 9px;
-  border-radius: 11px;
+.date-nav__value:hover {
+  border-color: var(--edge-strong);
+  background: var(--field-bg-focus);
 }
 
-.company-option--sm .company-option__text strong {
-  font-size: 14px;
+.date-nav__value svg {
+  color: var(--text-secondary);
 }
 
-.company-option__dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex: 0 0 auto;
+.date-nav__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
 }
 
-.money-block {
+/* ── Четыре денежных поля в один ряд ── */
+
+.day-sheet__money {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.cash-block {
-  margin-top: 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
 }
 
-.cash-block__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+.day-sheet__money .field {
+  gap: 5px;
+}
+
+.day-sheet__money .input--money {
+  padding: 10px 32px 10px 12px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.day-sheet__money .money-field__suffix {
+  right: 12px;
+  font-size: 13px;
+}
+
+.day-sheet__money .field__hint {
+  font-size: 11px;
+  min-height: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cash-delta {
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-}
-
-.cash-delta.is-positive {
+  font-weight: 600;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .cash-delta.is-negative {
   color: var(--text-secondary);
 }
 
-.cash-flow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: start;
-  gap: 10px;
-}
+/* ── Расходы ── */
 
-.cash-flow__arrow {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 40px;
-  margin-top: 19px;
-  color: var(--text-tertiary);
-}
-
-.day-actions {
+.day-sheet__expenses {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.sheet-head {
+  display: flex;
   align-items: center;
   gap: 10px;
-  padding: 2px 2px 10px;
 }
 
-.day-actions__note {
+.sheet-head__title {
   font-size: 12px;
-  color: var(--text-tertiary);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
-.day-summary__head {
+.sheet-head__sum {
+  font-size: 13.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet-head .btn {
+  margin-left: auto;
+}
+
+/* ── Комментарий ── */
+
+.sheet-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.sheet-note .textarea {
+  min-height: 54px;
+}
+
+/* ── Панель действий: липнет к низу, итоги и кнопки рядом ── */
+
+.day-bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-pop);
 }
 
-.day-summary__title {
-  font-size: 12px;
+.day-bar__stats {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.day-bar__total {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.day-bar__label {
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--text-tertiary);
 }
 
-.company-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  font-size: 11.5px;
-  font-weight: 700;
-}
-
-.day-summary__main {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.day-summary__label {
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.day-summary__value {
-  font-size: 30px;
+.day-bar__total strong {
+  font-size: 23px;
   font-weight: 800;
   letter-spacing: -0.025em;
+  line-height: 1.15;
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
 }
 
-.day-summary__caption {
-  font-size: 11.5px;
-  color: var(--text-tertiary);
-}
-
-.day-summary__rows {
+.day-bar__facts {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.summary-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.summary-chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  padding: 5px 9px;
-  border-radius: 8px;
-  background: var(--tint-weak);
-  font-size: 11.5px;
+  gap: 2px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
-.summary-chip b {
+.day-bar__facts b {
+  margin-left: 4px;
   color: var(--text);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.day-summary__hint {
+.day-bar__actions {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: var(--text-tertiary);
+  margin-left: auto;
+  flex-wrap: wrap;
 }
 
-.day-summary__hint svg {
-  flex: 0 0 auto;
-  margin-top: 1px;
+@media (max-width: 980px) {
+  .day-sheet__money {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-@media (max-width: 860px) {
-  .money-block {
+@media (max-width: 700px) {
+  .day-bar {
+    position: static;
+  }
+
+  .day-bar__actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .day-bar__actions .btn--primary {
+    flex: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .day-sheet__money {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .cash-flow {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .cash-flow__arrow {
-    display: none;
+  .day-sheet__money .field__hint {
+    white-space: normal;
   }
 }
