@@ -187,10 +187,7 @@ export function Dashboard() {
                     {formatNumber(cashNow)}
                     <span className="hero__unit">₽</span>
                   </div>
-                  <div className="hero__pot-hint">
-                    остаток после НЗ · в НЗ отдельно{' '}
-                    <strong>{formatMoney(current.pots.reserve)}</strong>
-                  </div>
+                  <div className="hero__pot-hint">нал вечером − НЗ · рабочий остаток</div>
                 </div>
 
                 <div className="hero__pot hero__pot--terminal">
@@ -204,6 +201,11 @@ export function Dashboard() {
                   </div>
                   <div className="hero__pot-hint">уходит в банк · не остаток кассы</div>
                 </div>
+              </div>
+
+              <div className="hero__note">
+                в НЗ отдельно <strong>{formatMoney(current.pots.reserve)}</strong> — отложенные
+                деньги, в остаток не входят
               </div>
 
               <div className="hero__meta">
