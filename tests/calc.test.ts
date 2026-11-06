@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Adjustment, DayRecord } from '../shared/model';
+import { buildDemoData } from '../src/lib/demo';
+import { todayIso } from '../src/lib/format';
 import {
+  cashChainIssues,
   companyBreakdown,
   companyTotals,
   dailySeries,
@@ -14,6 +17,8 @@ import {
 } from '../src/lib/calc';
 
 const RATE = 2.75;
+/** Стартовые остатки кассы обеих компаний из демо (`tillBase`). */
+const PROFILES_START_TILL = [14000, 8000];
 
 function rec(
   partial: Partial<DayRecord> & { company: DayRecord['company']; date: string },
@@ -209,7 +214,7 @@ describe('движения денег', () => {
     expect(totals.pots.total).toBe(128999.5);
   });
 
-  it('НЗ копится с учётом движений', () => {
+  it('перекладывание в НЗ двигает деньги из кассы, а не создаёт их', () => {
     const adjustments = [
       adj({ company: 'zaton', date: '2025-11-04', target: 'reserve', direction: 'in', amount: 10000 }),
       adj({ company: 'artfokus', date: '2025-11-04', target: 'reserve', direction: 'out', amount: 3000 }),
@@ -219,8 +224,11 @@ describe('движения денег', () => {
     // НЗ — это отложенное, оно не уменьшает заработок, а переезжает в отдельный «карман».
     expect(totals.earned).toBe(113999.5);
     expect(totals.pots.reserve).toBe(16500);
-    expect(totals.pots.total).toBe(128999.5 + 10000 - 3000);
-    expect(totals.adjustments.reserveNet).toBe(7000);
+    // Из кассы ушло 10 000 (zaton) и вернулось 3 000 (artfokus).
+    expect(totals.pots.cash).toBe(24000 - 10000 + 3000);
+    expect(totals.adjustments.cashNet).toBe(-7000);
+    // Итог не меняется: деньги не появились и не исчезли, они просто лежат в другом месте.
+    expect(totals.pots.total).toBe(128999.5);
   });
 
   it('поступление через терминал идёт в остаток за вычетом комиссии', () => {
@@ -270,6 +278,67 @@ describe('движения денег', () => {
   });
 });
 
+describe('цепочка наличных', () => {
+  it('не находит разрывов, когда остаток перенесён верно', () => {
+    expect(cashChainIssues(records, [])).toEqual([]);
+  });
+
+  it('находит разрыв, если «касса вчера» не равна прошлому факту', () => {
+    const broken = records.map((record) =>
+      record.company === 'zaton' && record.date === '2025-11-02'
+        ? { ...record, cashPrev: record.cashPrev + 5000 }
+        : record,
+    );
+    const issues = cashChainIssues(broken, []);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      company: 'zaton',
+      date: '2025-11-02',
+      entered: 14600,
+      expected: 9600,
+      gap: 5000,
+    });
+  });
+
+  it('учитывает движения по кассе между записями', () => {
+    const extended = [
+      ...records,
+      rec({ company: 'zaton', date: '2025-11-06', cashPrev: 23000, cashFact: 23000 }),
+    ];
+    // 20 000 (факт 02.11) + 3 000 внесли = 23 000 — разрыва нет
+    const explained = [adj({ company: 'zaton', date: '2025-11-03', target: 'cash', direction: 'in', amount: 3000 })];
+    expect(cashChainIssues(extended, explained)).toEqual([]);
+    // без движения те же 23 000 — это «появившиеся» деньги
+    expect(cashChainIssues(extended, [])[0]).toMatchObject({ date: '2025-11-06', gap: 3000 });
+  });
+});
+
+describe('демо-данные', () => {
+  it('сходятся: остаток = стартовая касса + заработано ± движения, цепочка без разрывов', () => {
+    const data = buildDemoData(todayIso());
+    const totals = totalsOf(data.records, data.adjustments, RATE);
+
+    const opening = PROFILES_START_TILL.reduce((sum, value) => sum + value, 0);
+    const lastDate: Record<string, string> = {};
+    for (const record of data.records) {
+      if (!lastDate[record.company] || record.date > lastDate[record.company]) {
+        lastDate[record.company] = record.date;
+      }
+    }
+    const movements = data.adjustments.reduce((sum, adjustment) => {
+      // Перекладывание в НЗ итог не меняет, а движения внутри записанных дней уже в факте.
+      if (adjustment.target === 'reserve') return sum;
+      if (adjustment.target === 'cash' && !(adjustment.date > (lastDate[adjustment.company] ?? ''))) {
+        return sum;
+      }
+      return sum + (adjustment.direction === 'in' ? adjustment.amount : -adjustment.amount);
+    }, 0);
+
+    expect(opening + totals.earned + movements).toBeCloseTo(totals.pots.total, 2);
+    expect(cashChainIssues(data.records, data.adjustments)).toEqual([]);
+  });
+});
+
 describe('suggestedCashPrev', () => {
   it('берёт факт последней записи компании', () => {
     expect(suggestedCashPrev(records, [], 'zaton', '2025-11-03')).toBe(20000);
@@ -280,7 +349,8 @@ describe('suggestedCashPrev', () => {
       adj({ company: 'zaton', date: '2025-11-03', target: 'cash', direction: 'in', amount: 15000 }),
       adj({ company: 'zaton', date: '2025-11-03', target: 'reserve', direction: 'in', amount: 9000 }),
     ];
-    expect(suggestedCashPrev(records, adjustments, 'zaton', '2025-11-04')).toBe(35000);
+    // Факт 20 000 + 15 000 внесли в кассу − 9 000 переложили в НЗ = 26 000
+    expect(suggestedCashPrev(records, adjustments, 'zaton', '2025-11-04')).toBe(26000);
   });
 
   it('не видит чужие компании и будущие движения', () => {

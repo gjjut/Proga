@@ -68,6 +68,19 @@ export function recordExpensesTotal(record: DayRecord): number {
   return round2(record.expenses.reduce((sum, expense) => sum + expense.amount, 0));
 }
 
+/**
+ * Как движение меняет НАЛИЧНЫЕ в кассе.
+ *   cash    — напрямую,
+ *   НЗ      — перекладывание: положили в НЗ — из кассы ушло, забрали — вернулось,
+ *   терминал — деньги приходят/уходят с терминала, кассы не касаются.
+ */
+export function cashDeltaOf(adjustment: Adjustment): number {
+  const signed = adjustmentSigned(adjustment);
+  if (adjustment.target === 'cash') return signed;
+  if (adjustment.target === 'reserve') return -signed;
+  return 0;
+}
+
 export function commissionOf(amount: number, rate: number = DEFAULT_COMMISSION_RATE): number {
   return round2((amount * rate) / 100);
 }
@@ -228,6 +241,11 @@ export function totalsOf(
 
     if (adjustment.target === 'reserve') {
       reserveAdjustments += signed;
+      // НЗ — такой же кошелёк: передвинули деньги в копилку — из кассы они ушли.
+      const lastRecord = lastByCompany.get(adjustment.company);
+      if (!lastRecord || adjustment.date > lastRecord.date) {
+        impact.cashNet += -signed;
+      }
       continue;
     }
 
@@ -254,10 +272,10 @@ export function totalsOf(
       .filter(
         (adjustment) =>
           adjustment.company === company.id &&
-          adjustment.target === 'cash' &&
+          (adjustment.target === 'cash' || adjustment.target === 'reserve') &&
           (!lastRecord || adjustment.date > lastRecord.date),
       )
-      .reduce((sum, adjustment) => sum + adjustmentSigned(adjustment), 0);
+      .reduce((sum, adjustment) => sum + cashDeltaOf(adjustment), 0);
     cash += base + after;
   }
 
@@ -333,13 +351,61 @@ export function suggestedCashPrev(
     .filter(
       (adjustment) =>
         adjustment.company === company &&
-        adjustment.target === 'cash' &&
+        (adjustment.target === 'cash' || adjustment.target === 'reserve') &&
         adjustment.date > baseDate &&
         adjustment.date < date,
     )
-    .reduce((sum, adjustment) => sum + adjustmentSigned(adjustment), 0);
+    .reduce((sum, adjustment) => sum + cashDeltaOf(adjustment), 0);
 
   return round2(base + movements);
+}
+
+export interface CashChainIssue {
+  company: CompanyId;
+  date: string;
+  /** Что ввели в поле «касса вчера» */
+  entered: number;
+  /** Сколько должно было быть: факт прошлой записи ± движения по кассе */
+  expected: number;
+  /** Разница «ввели − должно быть»: плюс — деньги появились, минус — пропали */
+  gap: number;
+}
+
+/**
+ * Проверка цепочки наличных: вчерашний остаток в каждой записи должен совпадать
+ * с фактическим остатком прошлой записи компании плюс движения по кассе между ними.
+ * Если не совпадает, в остатках появляются «лишние» или «потерянные» деньги —
+ * именно так выглядят неверно перенесённые остатки.
+ */
+export function cashChainIssues(
+  records: DayRecord[],
+  adjustments: Adjustment[] = [],
+): CashChainIssue[] {
+  const issues: CashChainIssue[] = [];
+
+  for (const company of COMPANIES) {
+    const own = records
+      .filter((record) => record.company === company.id)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.updatedAt.localeCompare(b.updatedAt));
+
+    // Первую запись компании не проверяем: до неё остаток кассы неизвестен.
+    for (let index = 1; index < own.length; index += 1) {
+      const record = own[index];
+      const expected = suggestedCashPrev(records, adjustments, company.id, record.date);
+      const gap = round2(record.cashPrev - expected);
+      if (Math.abs(gap) > 0.01) {
+        issues.push({
+          company: company.id,
+          date: record.date,
+          entered: record.cashPrev,
+          expected,
+          gap,
+        });
+      }
+    }
+  }
+
+  return issues.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export interface RecordFilter {

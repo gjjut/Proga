@@ -20,12 +20,14 @@ interface DemoProfile {
   company: CompanyId;
   base: number;
   spread: number;
+  /** Какая доля оборота приходит наличными (нужна, чтобы касса не упиралась в ноль). */
   cashShare: number;
   reserveShare: number;
-  startTill: number;
-  /** Сверху этой суммы кассу «сдают на счёт» — так демо не копит миллионы в кассе. */
-  tillCap: number;
-  /** Сверху этой суммы деньги с терминала «изымают на счёт». */
+  /** Остаток кассы, к которому возвращаются после сдачи выручки на счёт. */
+  tillBase: number;
+  /** Выше этого остатка деньги из кассы забирают на счёт. */
+  tillTop: number;
+  /** Выше этой суммы деньги с терминала изымают на счёт. */
   terminalCap: number;
   expenses: { comment: string; min: number; max: number }[];
 }
@@ -35,10 +37,10 @@ const PROFILES: DemoProfile[] = [
     company: 'zaton',
     base: 46000,
     spread: 16000,
-    cashShare: 0.16,
+    cashShare: 0.26,
     reserveShare: 0.07,
-    startTill: 18400,
-    tillCap: 30000,
+    tillBase: 14000,
+    tillTop: 32000,
     terminalCap: 160000,
     expenses: [
       { comment: 'Закупка корма и прикормки', min: 3200, max: 9800 },
@@ -53,10 +55,10 @@ const PROFILES: DemoProfile[] = [
     company: 'artfokus',
     base: 28000,
     spread: 11000,
-    cashShare: 0.12,
+    cashShare: 0.2,
     reserveShare: 0.09,
-    startTill: 9600,
-    tillCap: 22000,
+    tillBase: 8000,
+    tillTop: 22000,
     terminalCap: 110000,
     expenses: [
       { comment: 'Аренда студии', min: 8000, max: 12000 },
@@ -86,23 +88,67 @@ function isoShift(baseIso: string, delta: number): string {
   return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`;
 }
 
+/** Круглая сумма до сотни рублей вниз — так числа в демо выглядят «живыми», а не машинными. */
+function round100(value: number): number {
+  return Math.round(value / 100) * 100;
+}
+
 export function buildDemoData(todayIso: string, days = 42): AppData {
   const random = mulberry32(20260101);
   const records: DayRecord[] = [];
-  const withdrawals: Adjustment[] = [];
+  const adjustments: Adjustment[] = [];
 
   for (const profile of PROFILES) {
-    let till = profile.startTill;
+    // Касса тянется из дня в день по цепочке: вчерашний факт → сегодняшний факт.
+    let till = profile.tillBase;
     let onTerminal = 0;
 
     for (let offset = days - 1; offset >= 0; offset -= 1) {
       const date = isoShift(todayIso, -offset);
       const weekday = new Date(`${date}T12:00:00`).getDay();
-      // Выходные пропускаем чаще, чем будни.
-      const skipChance = weekday === 0 || weekday === 6 ? 0.45 : 0.08;
-      if (random() < skipChance) continue;
+      const isWeekend = weekday === 0 || weekday === 6;
+      const dayOff = random() < (isWeekend ? 0.45 : 0.08);
 
-      const terminal = Math.round((profile.base + (random() - 0.5) * profile.spread) / 100) * 100;
+      // В день без записи хозяин разбирается с деньгами: сдаёт излишек кассы на счёт
+      // и иногда перекладывает часть в НЗ. Движения только в такие дни — тогда
+      // они не спорят с фактическим остатком записанного дня.
+      if (dayOff) {
+        if (till > profile.tillTop) {
+          const amount = round100(till - profile.tillBase);
+          if (amount >= 1000) {
+            adjustments.push({
+              id: newId(),
+              company: profile.company,
+              date,
+              target: 'cash',
+              direction: 'out',
+              amount,
+              comment: 'Сдали выручку на счёт',
+              createdAt: new Date(`${date}T12:00:00`).toISOString(),
+            });
+            till = round2(till - amount);
+          }
+        }
+        if (random() < 0.12 && till > 6000) {
+          const amount = round100(till * 0.25);
+          if (amount >= 1000) {
+            adjustments.push({
+              id: newId(),
+              company: profile.company,
+              date,
+              target: 'reserve',
+              direction: 'in',
+              amount,
+              comment: 'Переложили часть кассы в НЗ',
+              createdAt: new Date(`${date}T13:00:00`).toISOString(),
+            });
+            till = round2(till - amount);
+          }
+        }
+        continue;
+      }
+
+      const terminal = round100(profile.base + (random() - 0.5) * profile.spread);
       if (terminal <= 0) continue;
 
       const expenseRows: Expense[] = [];
@@ -112,43 +158,28 @@ export function buildDemoData(todayIso: string, days = 42): AppData {
         const amount = Math.round((template.min + random() * (template.max - template.min)) / 50) * 50;
         expenseRows.push({ id: newId(), amount, comment: template.comment });
       }
-      const expenseSum = expenseRows.reduce((sum, expense) => sum + expense.amount, 0);
+      const reserve = round100(terminal * profile.reserveShare);
 
-      const reserve = Math.round((terminal * profile.reserveShare) / 100) * 100;
       const cashPrev = round2(till);
-      // Наличная выручка должна покрывать расходы и отложенное в НЗ — иначе касса уходит в ноль.
-      const plannedSales = Math.round((terminal * profile.cashShare * (0.7 + random())) / 100) * 100;
-      const cashSales = Math.max(
-        plannedSales,
-        expenseSum + reserve + 800 + Math.round((random() * 1200) / 100) * 100,
-      );
-      // НЗ лежит отдельно от кассы: из кассы уходят и расходы, и отложенное.
-      let cashFact = round2(cashPrev + cashSales - expenseSum - reserve);
-      if (cashFact > profile.tillCap) {
-        withdrawals.push({
-          id: newId(),
-          company: profile.company,
-          date,
-          target: 'cash',
-          direction: 'out',
-          amount: round2(cashFact - profile.tillCap),
-          comment: 'Сдали выручку на счёт',
-          createdAt: new Date(`${date}T20:00:00`).toISOString(),
-        });
-        cashFact = round2(profile.tillCap);
-      }
-      till = Math.max(0, cashFact);
+      // Наличных продали столько, чтобы покрыть расходы, НЗ и оставить в кассе прибавку.
+      // В «тесный» день прибавка отрицательная — касса проседает, это нормально.
+      const tight = random() < 0.22;
+      const raw =
+        (tight ? -1 : 1) * round100(400 + random() * (profile.base * profile.cashShare * 0.12));
+      const margin = Math.max(raw, 500 - cashPrev);
+      const cashFact = round2(cashPrev + margin);
+      till = cashFact;
 
       // Деньги с терминала периодически изымают на счёт — иначе «на терминале» копится вечно.
-      onTerminal += terminal - Math.round((terminal * 2.75) / 100);
+      onTerminal += terminal - round100((terminal * 2.75) / 100);
       if (onTerminal > profile.terminalCap) {
-        withdrawals.push({
+        adjustments.push({
           id: newId(),
           company: profile.company,
           date,
           target: 'terminal',
           direction: 'out',
-          amount: Math.round((onTerminal - profile.terminalCap) / 100) * 100,
+          amount: round100(onTerminal - profile.terminalCap),
           comment: 'Изъяли с терминала на счёт',
           createdAt: new Date(`${date}T20:00:00`).toISOString(),
         });
@@ -179,10 +210,8 @@ export function buildDemoData(todayIso: string, days = 42): AppData {
 
   records.sort((a, b) => a.date.localeCompare(b.date) || a.company.localeCompare(b.company));
 
-  // Сторонние движения денег — на дни без записей, чтобы были видны в остатках.
+  // Сторонние поступления — на дни без записей, чтобы не спорить с фактом кассы.
   const takenDates = new Set(records.map((record) => `${record.company}|${record.date}`));
-  const adjustments: Adjustment[] = [...withdrawals];
-
   const addAdjustment = (
     company: CompanyId,
     baseDate: string,
@@ -192,7 +221,7 @@ export function buildDemoData(todayIso: string, days = 42): AppData {
     comment: string,
   ) => {
     let date = baseDate;
-    for (let attempt = 0; attempt < 6; attempt += 1) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
       if (!takenDates.has(`${company}|${date}`)) break;
       date = isoShift(date, -1);
     }
@@ -210,12 +239,10 @@ export function buildDemoData(todayIso: string, days = 42): AppData {
     });
   };
 
-  addAdjustment('zaton', isoShift(todayIso, -9), 'cash', 'in', 15000, 'Внесли личные деньги на корм');
-  addAdjustment('zaton', isoShift(todayIso, -4), 'cash', 'out', 22000, 'Забрали выручку на счёт');
-  addAdjustment('zaton', isoShift(todayIso, -2), 'reserve', 'in', 10000, 'Переложили в НЗ');
+  addAdjustment('zaton', isoShift(todayIso, -9), 'terminal', 'in', 12000, 'Оплата по счёту от клиента');
   addAdjustment('artfokus', isoShift(todayIso, -7), 'terminal', 'in', 24000, 'Оплата по счёту от клиента');
-  addAdjustment('artfokus', isoShift(todayIso, -3), 'reserve', 'out', 8000, 'Взяли из НЗ на аренду');
-  addAdjustment('artfokus', isoShift(todayIso, -1), 'cash', 'in', 6000, 'Вернули остаток с закупки');
+
+  adjustments.sort((a, b) => a.date.localeCompare(b.date));
 
   return {
     schemaVersion: 2,

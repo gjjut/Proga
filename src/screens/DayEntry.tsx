@@ -352,10 +352,10 @@ export function DayEntry() {
             <span className="field__hint">
               {suggestDiffers || storedPrevDiffers ? (
                 <button type="button" className="suggest-link" onClick={fillSuggestedPrev}>
-                  Подставить {formatMoney(suggested)}
+                  В прошлой записи {formatMoney(suggested)} — подставить
                 </button>
               ) : (
-                'из прошлой записи'
+                'перенос из прошлой записи'
               )}
             </span>
           </label>
@@ -371,7 +371,7 @@ export function DayEntry() {
               ariaLabel="Фактическое наличие наличных в кассе"
             />
             <span className="field__hint">
-              изменение{' '}
+              остаток на конец дня · изменение{' '}
               <b className={`cash-delta${cashChange < 0 ? ' is-negative' : ''}`}>
                 {formatSignedMoney(cashChange)}
               </b>
@@ -470,7 +470,10 @@ export function DayEntry() {
                 Комиссия <b>{formatMinusMoney(commission)}</b>
               </span>
               <span>
-                Касса <b>{formatSignedMoney(cashChange)}</b>
+                Касса за день <b>{formatSignedMoney(cashChange)}</b>
+              </span>
+              <span>
+                В кассе на конец дня <b>{formatMoney(factValue)}</b>
               </span>
               <span>
                 В НЗ отложено <b>{formatMoney(reserveValue)}</b>
