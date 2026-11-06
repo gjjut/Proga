@@ -248,7 +248,7 @@ export function DayEntry() {
         <div className="screen__title-wrap">
           <h1 className="screen__title">Запись дня</h1>
           <p className="screen__subtitle">
-            {companyMeta.name} · {isToday ? 'сегодня' : formatDateWithWeekday(date)}
+            {companyMeta.name} · {isToday ? 'сегодня' : formatDateWithWeekday(date).replace(' г.', '')}
           </p>
         </div>
         <div className="screen__actions">
@@ -314,7 +314,7 @@ export function DayEntry() {
               }}
             >
               <CalendarIcon size={15} />
-              <span>{formatDateWithWeekday(date)}</span>
+              <span>{formatDateWithWeekday(date).replace(' г.', '')}</span>
             </button>
             <input
               ref={dateInputRef}
