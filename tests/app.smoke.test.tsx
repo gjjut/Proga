@@ -146,14 +146,16 @@ describe('Приложение целиком', () => {
     expect(text).toContain('Главное');
     expect(text).toContain('Затон Рыбака');
     expect(text).toContain('Арт Фокус');
-    expect(text).toContain('Общий остаток');
-    expect(text).toContain('Выручка');
+    expect(text).toContain('Остаток на сейчас');
+    expect(text).toContain('Итог');
     expect(text).toContain('Наличные');
     expect(text).toContain('На терминале');
     expect(text).toContain('В НЗ');
     expect(text).toContain('Заработано');
-    expect(text).toContain('Динамика выручки');
-    expect(container.querySelectorAll('.pots__item')).toHaveLength(3);
+    expect(text).toContain('Динамика итога');
+    // Остаток на сейчас = наличные + терминал; НЗ показывается отдельно, вне остатка.
+    expect(container.querySelectorAll('.pots__item')).toHaveLength(2);
+    expect(text).toContain('в НЗ отдельно');
     expect(container.querySelectorAll('.company-card')).toHaveLength(2);
     expect(container.querySelectorAll('.chart__col').length).toBe(14);
     // Цепочка наличных в демо сходится — предупреждения о разрыве нет.
@@ -164,7 +166,8 @@ describe('Приложение целиком', () => {
   it('показывает остаток кассы на конец дня', async () => {
     await navTo('Запись дня');
     const bar = container.querySelector('.day-bar')?.textContent ?? '';
-    expect(bar).toContain('В кассе на конец дня');
+    expect(bar).toContain('Нал вечером');
+    expect(bar).toContain('В кассе после НЗ');
     expect(bar).toContain('Касса за день');
   });
 
@@ -186,7 +189,7 @@ describe('Приложение целиком', () => {
     expect(container.querySelector('.day-bar')).not.toBeNull();
     expect(container.textContent).toContain('Заработано за день');
     expect(container.textContent).toContain('Касса вчера');
-    expect(container.textContent).toContain('Факт в кассе');
+    expect(container.textContent).toContain('Нал в кассе');
 
     await pickDate('2024-05-06');
 
@@ -218,11 +221,12 @@ describe('Приложение целиком', () => {
     const summaryText = container.querySelector('.day-bar')?.textContent ?? '';
     expect(summaryText).toContain('Заработано за день');
     expect(summaryText).toMatch(/48\s200/);
-    // Наличная выручка 4 600 + 3 400 + 4 500 = 12 500; выручка дня 60 700;
-    // заработано 60 700 − 1 325,5 − 3 400 = 55 974,5
-    expect(summaryText).toMatch(/55\s974,5/);
-    // Раньше расходы не попадали в минус: получалось 50 374,5.
-    expect(summaryText).not.toMatch(/50\s374/);
+    // Итог дня = нал вечером 9 600 + расходы 3 400 + терминал 48 200 − вчера 5 000 = 56 200;
+    // заработано 56 200 − 1 325,5 − 3 400 = 51 474,5; в кассе после НЗ 9 600 − 4 500 = 5 100
+    expect(summaryText).toMatch(/51\s474,5/);
+    expect(summaryText).toMatch(/5\s100/);
+    // Итог не должен включать НЗ: раньше «наличная выручка» восстанавливала ещё и 4 500.
+    expect(summaryText).not.toMatch(/55\s974,5/);
 
     await act(async () => {
       buttonByText('Сохранить день')?.click();
@@ -334,7 +338,7 @@ describe('Приложение целиком', () => {
     expect(container.querySelector('.record-list')).not.toBeNull();
     expect(container.querySelectorAll('.record').length).toBeGreaterThan(0);
     expect(container.textContent).toContain('Остаток вчера');
-    expect(container.textContent).toContain('Факт в кассе');
+    expect(container.textContent).toContain('Нал вечером');
     expect(container.textContent).toContain('Заработано за день');
     expect(container.textContent).toContain('Экспорт в Excel (CSV)');
     expect(container.querySelectorAll('.record__stat').length).toBeGreaterThanOrEqual(9);

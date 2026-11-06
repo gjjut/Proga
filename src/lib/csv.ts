@@ -84,12 +84,12 @@ export function buildCsv(
       'Компания',
       'Остаток вчера, ₽',
       'Терминал, ₽',
-      'Факт в кассе, ₽',
+      'Нал в кассе, ₽',
       'Изменение наличных, ₽',
-      'Наличная выручка, ₽',
+      'Итог наличными, ₽',
       'Расходы, ₽',
       'НЗ, ₽',
-      'Выручка дня, ₽',
+      'Итог дня, ₽',
       'Комиссия, ₽',
       'Заработано за день, ₽',
       'Кол-во расходов',
@@ -173,16 +173,15 @@ export function buildCsv(
   lines.push('');
   lines.push(row(['ИТОГИ ПО ПЕРИОДУ']));
   lines.push(row(['Показатель', 'Значение, ₽']));
-  lines.push(row(['Выручка (терминал + наличные)', totals.revenue]));
+  lines.push(row(['Итог (терминал + наличные)', totals.revenue]));
   lines.push(row([`Комиссия банка (${numCell(rate)}%)`, totals.commission]));
   lines.push(row(['Расходы', totals.expenses]));
-  lines.push(row(['Заработано (выручка − комиссия − расходы)', totals.earned]));
+  lines.push(row(['Заработано (итог − комиссия − расходы)', totals.earned]));
   lines.push(row(['НЗ накоплено', totals.reserve]));
   lines.push(row(['Наличные в кассе', totals.pots.cash]));
   lines.push(row(['На терминале (за вычетом комиссии)', totals.pots.terminal]));
   lines.push(row(['В НЗ', totals.pots.reserve]));
-  lines.push(row(['Общий остаток (наличные + терминал + НЗ)', totals.pots.total]));
-  lines.push(row(['Свободно без НЗ', totals.pots.free]));
+  lines.push(row(['Остаток на сейчас (наличные после НЗ + терминал)', totals.pots.free]));
   lines.push(row(['Записей дней', totals.records]));
   lines.push(row(['Строк расходов', totals.expenseCount]));
 

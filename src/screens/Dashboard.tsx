@@ -106,15 +106,15 @@ export function Dashboard() {
   const periodLabel = PERIODS.find((item) => item.id === period)?.label ?? 'Всё время';
   const hasAnyData = data.records.length > 0 || data.adjustments.length > 0;
 
+  // Остаток на сейчас — свободные деньги: наличные (уже без НЗ) + терминал.
   const pots = [
     { id: 'cash', label: 'Наличные', value: current.pots.cash },
     { id: 'terminal', label: 'На терминале', value: current.pots.terminal },
-    { id: 'reserve', label: 'В НЗ', value: current.pots.reserve },
   ].map((pot) => ({
     ...pot,
     share:
-      current.pots.total !== 0
-        ? Math.round((Math.max(0, pot.value) / Math.max(1, current.pots.total)) * 100)
+      current.pots.free !== 0
+        ? Math.round((Math.max(0, pot.value) / Math.max(1, current.pots.free)) * 100)
         : 0,
   }));
   const potShares = pots.filter((pot) => pot.value > 0).map((pot) => ({
@@ -186,14 +186,14 @@ export function Dashboard() {
         <>
           <section className="hero card">
             <div className="hero__main">
-              <div className="hero__eyebrow">Общий остаток · на сейчас</div>
-              <div className={`hero__value${current.pots.total < 0 ? ' is-negative' : ''}`}>
-                {formatNumber(current.pots.total)}
+              <div className="hero__eyebrow">Остаток на сейчас</div>
+              <div className={`hero__value${current.pots.free < 0 ? ' is-negative' : ''}`}>
+                {formatNumber(current.pots.free)}
                 <span className="hero__unit">₽</span>
               </div>
               <div className="hero__caption">
-                наличные + терминал + НЗ · свободно без НЗ{' '}
-                <strong>{formatMoney(current.pots.free)}</strong>
+                наличные + терминал · в НЗ отдельно{' '}
+                <strong>{formatMoney(current.pots.reserve)}</strong>
               </div>
 
               <div className="pots">
@@ -237,7 +237,7 @@ export function Dashboard() {
               </div>
             </div>
             <div className="hero__stats">
-              <MoneyStat label="Выручка" amount={totals.revenue} icon={<TrendUpIcon size={15} />} />
+              <MoneyStat label="Итог" amount={totals.revenue} icon={<TrendUpIcon size={15} />} />
               <MoneyStat
                 label={`Комиссия ${formatPercent(rate)}`}
                 amount={totals.commission}
@@ -254,7 +254,7 @@ export function Dashboard() {
                 label={`Заработано · ${periodLabel.toLowerCase()}`}
                 amount={totals.earned}
                 icon={<WalletIcon size={15} />}
-                hint="выручка − комиссия − расходы"
+                hint="итог − комиссия − расходы"
               />
             </div>
           </section>
@@ -267,7 +267,7 @@ export function Dashboard() {
                 <span className="balance-check__count">{chainIssues.length}</span>
               </div>
               <p className="balance-check__text">
-                «Касса вчера» в записи не равна фактическому остатку прошлой записи компании.
+                «Касса вчера» в записи не равна остатку прошлой записи компании (нал минус НЗ).
                 Из-за этого наличные «прибавляются» или пропадают. Укажите движение в
                 «Поступлениях» (например, «забрали на счёт») или поправьте остаток в записи дня.
               </p>
@@ -301,8 +301,8 @@ export function Dashboard() {
             <div className="balance-check">
               <CheckIcon size={14} />
               <span>
-                Цепочка наличных сходится: остаток «вчера» в каждой записи равен факту прошлого дня,
-                деньги никуда не пропадают
+                Цепочка наличных сходится: «касса вчера» в каждой записи равна остатку после НЗ
+                прошлого дня — деньги никуда не пропадают
               </span>
             </div>
           )}
@@ -329,11 +329,11 @@ export function Dashboard() {
                 </div>
 
                 <div className="company-card__main">
-                  <div className="company-card__label">Общий остаток</div>
+                  <div className="company-card__label">Остаток на сейчас</div>
                   <div
-                    className={`company-card__value${nowPots.total < 0 ? ' is-negative' : ''}`}
+                    className={`company-card__value${nowPots.free < 0 ? ' is-negative' : ''}`}
                   >
-                    {formatMoney(nowPots.total)}
+                    {formatMoney(nowPots.free)}
                   </div>
                 </div>
 
@@ -351,7 +351,7 @@ export function Dashboard() {
                     <span className="mini-metric__value">{formatMoney(nowPots.reserve)}</span>
                   </div>
                   <div className="mini-metric">
-                    <span className="mini-metric__label">Выручка · {periodLabel.toLowerCase()}</span>
+                    <span className="mini-metric__label">Итог · {periodLabel.toLowerCase()}</span>
                     <span className="mini-metric__value">{formatMoney(companyStats.revenue)}</span>
                   </div>
                 </div>
@@ -378,7 +378,7 @@ export function Dashboard() {
           <section className="card">
             <div className="card__header">
               <div>
-                <h2 className="card__title">Динамика выручки</h2>
+                <h2 className="card__title">Динамика итога</h2>
                 <p className="card__hint">Последние 14 дней · итог дня по записям</p>
               </div>
               <div className="card__total">

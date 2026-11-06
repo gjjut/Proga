@@ -124,12 +124,14 @@ export function DayEntry() {
   const reserveValue = parseMoneyInput(reserve);
   const expensesValue = expenses.reduce((sum, expense) => sum + parseMoneyInput(expense.amount), 0);
 
-  const cashChange = round2(factValue - prevValue);
-  // Из кассы ушли и расходы, и отложенное в НЗ — их возвращаем в наличную выручку.
-  const cashSales = round2(cashChange + expensesValue + reserveValue);
+  // «Нал в кассе» — весь нал вечером, включая отложенное в НЗ.
+  const cashBalance = round2(factValue - reserveValue);
+  const cashChange = round2(cashBalance - prevValue);
+  // Итог наличными = нал вечером + расходы − остаток наличных вчера.
+  const cashSales = round2(factValue + expensesValue - prevValue);
   const revenue = round2(terminalValue + cashSales);
   const commission = commissionOf(terminalValue, rate);
-  // Заработано = выручка − комиссия − расходы. НЗ заработок не уменьшает:
+  // Заработано = итог − комиссия − расходы. НЗ заработок не уменьшает:
   // это переложенные в запас свои же деньги, они видны в остатках.
   const dayEarned = round2(revenue - commission - expensesValue);
   const suggestDiffers = !existing && Math.abs(suggested - prevValue) > 0.005;
@@ -361,7 +363,7 @@ export function DayEntry() {
           </label>
 
           <label className="field">
-            <span className="field__label">Факт в кассе</span>
+            <span className="field__label">Нал в кассе</span>
             <MoneyInput
               value={cashFact}
               onChange={(value) => {
@@ -371,9 +373,9 @@ export function DayEntry() {
               ariaLabel="Фактическое наличие наличных в кассе"
             />
             <span className="field__hint">
-              остаток на конец дня · изменение{' '}
+              весь нал вечером, с НЗ · в кассе после НЗ{' '}
               <b className={`cash-delta${cashChange < 0 ? ' is-negative' : ''}`}>
-                {formatSignedMoney(cashChange)}
+                {formatMoney(cashBalance)}
               </b>
             </span>
           </label>
@@ -388,7 +390,7 @@ export function DayEntry() {
               }}
               ariaLabel="Сумма, положенная в НЗ"
             />
-            <span className="field__hint">без комиссии</span>
+            <span className="field__hint">отложили из этого нала · без комиссии</span>
           </label>
         </div>
 
@@ -470,10 +472,13 @@ export function DayEntry() {
                 Комиссия <b>{formatMinusMoney(commission)}</b>
               </span>
               <span>
-                Касса за день <b>{formatSignedMoney(cashChange)}</b>
+                Нал вечером <b>{formatMoney(factValue)}</b>
               </span>
               <span>
-                В кассе на конец дня <b>{formatMoney(factValue)}</b>
+                В кассе после НЗ <b>{formatMoney(cashBalance)}</b>
+              </span>
+              <span>
+                Касса за день <b>{formatSignedMoney(cashChange)}</b>
               </span>
               <span>
                 В НЗ отложено <b>{formatMoney(reserveValue)}</b>
@@ -481,8 +486,8 @@ export function DayEntry() {
             </div>
             <span className="day-bar__note">
               {expensesValue > 0
-                ? `Расходы ${formatMoney(expensesValue)} вычтены из кассы и из заработка; НЗ — запас, а не трата`
-                : 'НЗ — запас, а не трата: деньги остаются вашими, просто лежат отдельно'}
+                ? `Итог дня: нал ${formatMoney(factValue)} + расходы ${formatMoney(expensesValue)} + терминал ${formatMoney(terminalValue)} − вчера ${formatMoney(prevValue)}`
+                : `Итог дня: нал ${formatMoney(factValue)} + терминал ${formatMoney(terminalValue)} − вчера ${formatMoney(prevValue)}`}
             </span>
           </div>
         </div>
