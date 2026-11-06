@@ -166,9 +166,11 @@ describe('Приложение целиком', () => {
   it('показывает остаток кассы на конец дня', async () => {
     await navTo('Запись дня');
     const bar = container.querySelector('.day-bar')?.textContent ?? '';
+    expect(bar).toContain('Итог дня');
     expect(bar).toContain('Нал вечером');
     expect(bar).toContain('В кассе после НЗ');
-    expect(bar).toContain('Касса за день');
+    // Терминал в итоге со знаком плюс: он такая же прибыль, как и наличные.
+    expect(bar).toContain('Терминал +');
   });
 
   it('показывает в меню все пять разделов', () => {
@@ -187,7 +189,7 @@ describe('Приложение целиком', () => {
   it('сохраняет день по новой схеме и считает итог', async () => {
     await navTo('Запись дня');
     expect(container.querySelector('.day-bar')).not.toBeNull();
-    expect(container.textContent).toContain('Заработано за день');
+    expect(container.textContent).toContain('Итог дня');
     expect(container.textContent).toContain('Касса вчера');
     expect(container.textContent).toContain('Нал в кассе');
 
@@ -219,10 +221,12 @@ describe('Приложение целиком', () => {
 
     // Панель дня: терминал 48 200, касса 9 600 − 5 000 = 4 600, НЗ 4 500, расходы 3 400.
     const summaryText = container.querySelector('.day-bar')?.textContent ?? '';
-    expect(summaryText).toContain('Заработано за день');
-    expect(summaryText).toMatch(/48\s200/);
+    expect(summaryText).toContain('Итог дня');
+    expect(summaryText).toMatch(/\+48\s200/);
     // Итог дня = нал вечером 9 600 + расходы 3 400 + терминал 48 200 − вчера 5 000 = 56 200;
     // заработано 56 200 − 1 325,5 − 3 400 = 51 474,5; в кассе после НЗ 9 600 − 4 500 = 5 100
+    // крупно — итог дня 56 200; «Заработано» рядом: 51 474,5
+    expect(summaryText).toMatch(/56\s200/);
     expect(summaryText).toMatch(/51\s474,5/);
     expect(summaryText).toMatch(/5\s100/);
     // Итог не должен включать НЗ: раньше «наличная выручка» восстанавливала ещё и 4 500.

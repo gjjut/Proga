@@ -29,6 +29,7 @@ import {
   formatDateWithWeekday,
   formatMoney,
   formatMinusMoney,
+  formatNumber,
   formatPercent,
   formatSignedMoney,
   moneyToInput,
@@ -460,16 +461,22 @@ export function DayEntry() {
       <div className="day-bar">
         <div className="day-bar__stats">
           <div className="day-bar__total">
-            <span className="day-bar__label">Заработано за день</span>
-            <strong className={dayEarned < 0 ? 'is-negative' : ''}>{formatMoney(dayEarned)}</strong>
+            <span className="day-bar__label">Итог дня</span>
+            <strong className={revenue < 0 ? 'is-negative' : ''}>{formatMoney(revenue)}</strong>
           </div>
           <div className="day-bar__details">
             <div className="day-bar__facts">
               <span>
-                Терминал <b>{formatMoney(terminalValue)}</b>
+                Терминал <b>+{formatNumber(terminalValue)} ₽</b>
+              </span>
+              <span>
+                Наличными <b>{formatSignedMoney(cashSales)}</b>
               </span>
               <span>
                 Комиссия <b>{formatMinusMoney(commission)}</b>
+              </span>
+              <span>
+                Заработано <b>{formatMoney(dayEarned)}</b>
               </span>
               <span>
                 Нал вечером <b>{formatMoney(factValue)}</b>
@@ -478,16 +485,12 @@ export function DayEntry() {
                 В кассе после НЗ <b>{formatMoney(cashBalance)}</b>
               </span>
               <span>
-                Касса за день <b>{formatSignedMoney(cashChange)}</b>
-              </span>
-              <span>
                 В НЗ отложено <b>{formatMoney(reserveValue)}</b>
               </span>
             </div>
             <span className="day-bar__note">
-              {expensesValue > 0
-                ? `Итог дня: нал ${formatMoney(factValue)} + расходы ${formatMoney(expensesValue)} + терминал ${formatMoney(terminalValue)} − вчера ${formatMoney(prevValue)}`
-                : `Итог дня: нал ${formatMoney(factValue)} + терминал ${formatMoney(terminalValue)} − вчера ${formatMoney(prevValue)}`}
+              {`Итог = терминал ${formatNumber(terminalValue)} ₽ + наличными ${formatNumber(cashSales)} ₽`}
+              {` · наличными = нал ${formatNumber(factValue)} + расходы ${formatNumber(expensesValue)} − вчера ${formatNumber(prevValue)}`}
             </span>
           </div>
         </div>
