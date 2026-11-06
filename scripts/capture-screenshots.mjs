@@ -50,7 +50,7 @@ await shot('dashboard');
 
 // ── Запись дня: заполняем поля, чтобы на скриншоте были живые цифры ──
 await navTo('Запись дня');
-await page.waitForSelector('.day-summary');
+await page.waitForSelector('.day-bar');
 
 await fill(page.locator('input[aria-label="Остаток наличных предыдущего дня"]'), '10000');
 await fill(page.locator('input[aria-label="Сумма по терминалу"]'), '48200');

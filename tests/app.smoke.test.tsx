@@ -120,10 +120,10 @@ describe('Приложение целиком', () => {
 
   it('сохраняет день по новой схеме и считает итог', async () => {
     await navTo('Запись дня');
-    expect(container.querySelector('.day-summary')).not.toBeNull();
-    expect(container.textContent).toContain('Итог дня');
-    expect(container.textContent).toContain('Было вчера');
-    expect(container.textContent).toContain('Стало (факт)');
+    expect(container.querySelector('.day-bar')).not.toBeNull();
+    expect(container.textContent).toContain('Остаток дня');
+    expect(container.textContent).toContain('Касса вчера');
+    expect(container.textContent).toContain('Факт в кассе');
 
     const dateInput = container.querySelector<HTMLInputElement>('input[type="date"]');
     expect(dateInput).not.toBeNull();
@@ -155,8 +155,8 @@ describe('Приложение целиком', () => {
     await settle();
 
     // Итог дня в панели справа: 48200 + (9600 − 5000) + 3400 = 56200
-    const summaryText = container.querySelector('.day-summary')?.textContent ?? '';
-    expect(summaryText).toContain('Итог дня');
+    const summaryText = container.querySelector('.day-bar')?.textContent ?? '';
+    expect(summaryText).toContain('Остаток дня');
     expect(summaryText).toMatch(/56\s?200/);
     // Остаток дня: 56 200 − 1 325,50 − 4 500 = 50 374,50
     expect(summaryText).toMatch(/50\s374,5/);
