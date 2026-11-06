@@ -2932,6 +2932,17 @@ select {
   flex-wrap: wrap;
 }
 
+/* Компании — компактные пилюли, а не полосы на пол-экрана. */
+.day-sheet .company-picker--compact {
+  flex: 0 1 auto;
+  gap: 8px;
+}
+
+.day-sheet .company-option {
+  flex: 0 0 auto;
+  min-width: 172px;
+}
+
 /* ── Дата: своя подпись «5 ноября 2026, чт» + нативный календарь по клику ── */
 
 .date-nav {
