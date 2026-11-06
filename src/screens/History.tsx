@@ -254,8 +254,10 @@ export function History() {
           </strong>
         </div>
         <div className="summary-strip__item">
-          <span>Наличные сейчас</span>
-          <strong>{formatMoney(current.pots.cash)}</strong>
+          <span>Остаток в кассе</span>
+          <strong className={current.pots.cash < 0 ? 'is-negative' : ''}>
+            {formatMoney(current.pots.cash)}
+          </strong>
         </div>
         <div className="summary-strip__item">
           <span>На терминале</span>
@@ -264,12 +266,6 @@ export function History() {
         <div className="summary-strip__item">
           <span>В НЗ</span>
           <strong>{formatMoney(current.pots.reserve)}</strong>
-        </div>
-        <div className="summary-strip__item">
-          <span>Остаток на сейчас</span>
-          <strong className={current.pots.free < 0 ? 'is-negative' : ''}>
-            {formatMoney(current.pots.free)}
-          </strong>
         </div>
       </section>
 

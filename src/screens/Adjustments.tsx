@@ -270,7 +270,9 @@ export function Adjustments() {
 
           <div className="adjust-form__footer">
             <div className="adjust-preview">
-              <span className="adjust-preview__label">Влияние на свободный остаток</span>
+              <span className="adjust-preview__label">
+                {target === 'terminal' ? 'Влияние на терминал' : 'Влияние на остаток в кассе'}
+              </span>
               <strong
                 className={`adjust-preview__value${
                   impact < 0 ? ' is-negative' : impact > 0 ? ' is-positive' : ''

@@ -106,21 +106,10 @@ export function Dashboard() {
   const periodLabel = PERIODS.find((item) => item.id === period)?.label ?? 'Всё время';
   const hasAnyData = data.records.length > 0 || data.adjustments.length > 0;
 
-  // Остаток на сейчас — свободные деньги: наличные (уже без НЗ) + терминал.
-  const pots = [
-    { id: 'cash', label: 'Наличные', value: current.pots.cash },
-    { id: 'terminal', label: 'На терминале', value: current.pots.terminal },
-  ].map((pot) => ({
-    ...pot,
-    share:
-      current.pots.free !== 0
-        ? Math.round((Math.max(0, pot.value) / Math.max(1, current.pots.free)) * 100)
-        : 0,
-  }));
-  const potShares = pots.filter((pot) => pot.value > 0).map((pot) => ({
-    id: pot.id,
-    share: Math.max(pot.share, 2),
-  }));
+  // Остатки показываем раздельно и не складываем: наличные — это остаток,
+  // терминал остатком не считается, потому что уходит в банк.
+  const cashNow = current.pots.cash;
+  const terminalNow = current.pots.terminal;
 
   const handleExport = () => {
     if (periodRecords.length === 0 && periodAdjustments.length === 0) return;
@@ -186,36 +175,35 @@ export function Dashboard() {
         <>
           <section className="hero card">
             <div className="hero__main">
-              <div className="hero__eyebrow">Остаток на сейчас</div>
-              <div className={`hero__value${current.pots.free < 0 ? ' is-negative' : ''}`}>
-                {formatNumber(current.pots.free)}
-                <span className="hero__unit">₽</span>
-              </div>
-              <div className="hero__caption">
-                наличные + терминал · в НЗ отдельно{' '}
-                <strong>{formatMoney(current.pots.reserve)}</strong>
-              </div>
+              <div className="hero__eyebrow">Деньги на сейчас</div>
 
-              <div className="pots">
-                <div className="pots__bar" aria-hidden="true">
-                  {potShares.map((part) => (
-                    <span
-                      key={part.id}
-                      className={`pots__seg pots__seg--${part.id}`}
-                      style={{ width: `${part.share}%` }}
-                    />
-                  ))}
+              <div className="hero__pots">
+                <div className="hero__pot">
+                  <div className="hero__pot-label">
+                    <WalletIcon size={15} />
+                    <span>Наличные в кассе</span>
+                  </div>
+                  <div className={`hero__pot-value${cashNow < 0 ? ' is-negative' : ''}`}>
+                    {formatNumber(cashNow)}
+                    <span className="hero__unit">₽</span>
+                  </div>
+                  <div className="hero__pot-hint">
+                    остаток после НЗ · в НЗ отдельно{' '}
+                    <strong>{formatMoney(current.pots.reserve)}</strong>
+                  </div>
                 </div>
-                <ul className="pots__legend">
-                  {pots.map((pot) => (
-                    <li key={pot.id} className="pots__item">
-                      <span className={`pots__dot pots__dot--${pot.id}`} />
-                      <span className="pots__label">{pot.label}</span>
-                      <strong className="pots__value">{formatMoney(pot.value)}</strong>
-                      <span className="pots__share">{pot.share}%</span>
-                    </li>
-                  ))}
-                </ul>
+
+                <div className="hero__pot hero__pot--terminal">
+                  <div className="hero__pot-label">
+                    <BanknoteIcon size={15} />
+                    <span>На терминале</span>
+                  </div>
+                  <div className="hero__pot-value">
+                    {formatNumber(terminalNow)}
+                    <span className="hero__unit">₽</span>
+                  </div>
+                  <div className="hero__pot-hint">уходит в банк · не остаток кассы</div>
+                </div>
               </div>
 
               <div className="hero__meta">
@@ -329,30 +317,36 @@ export function Dashboard() {
                 </div>
 
                 <div className="company-card__main">
-                  <div className="company-card__label">Остаток на сейчас</div>
+                  <div className="company-card__label">Остаток в кассе</div>
                   <div
-                    className={`company-card__value${nowPots.free < 0 ? ' is-negative' : ''}`}
+                    className={`company-card__value${nowPots.cash < 0 ? ' is-negative' : ''}`}
                   >
-                    {formatMoney(nowPots.free)}
+                    {formatMoney(nowPots.cash)}
                   </div>
                 </div>
 
                 <div className="company-card__grid">
                   <div className="mini-metric">
-                    <span className="mini-metric__label">Наличные</span>
-                    <span className="mini-metric__value">{formatMoney(nowPots.cash)}</span>
-                  </div>
-                  <div className="mini-metric">
                     <span className="mini-metric__label">На терминале</span>
                     <span className="mini-metric__value">{formatMoney(nowPots.terminal)}</span>
+                    <span className="mini-metric__hint">уходит в банк</span>
                   </div>
                   <div className="mini-metric">
                     <span className="mini-metric__label">В НЗ</span>
                     <span className="mini-metric__value">{formatMoney(nowPots.reserve)}</span>
+                    <span className="mini-metric__hint">отложено, вне остатка</span>
                   </div>
                   <div className="mini-metric">
                     <span className="mini-metric__label">Итог · {periodLabel.toLowerCase()}</span>
                     <span className="mini-metric__value">{formatMoney(companyStats.revenue)}</span>
+                    <span className="mini-metric__hint">терминал + наличные</span>
+                  </div>
+                  <div className="mini-metric">
+                    <span className="mini-metric__label">
+                      Заработано · {periodLabel.toLowerCase()}
+                    </span>
+                    <span className="mini-metric__value">{formatMoney(companyStats.earned)}</span>
+                    <span className="mini-metric__hint">без комиссии и расходов</span>
                   </div>
                 </div>
 
