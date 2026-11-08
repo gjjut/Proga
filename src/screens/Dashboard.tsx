@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { companyById, COMPANIES } from '../../shared/model';
 import { RevenueChart } from '../components/Chart';
+import { MonthComparison } from '../components/MonthComparison';
 import {
   ArrowUpRightIcon,
   BanknoteIcon,
@@ -370,6 +371,8 @@ export function Dashboard() {
               );
             })}
           </div>
+
+          <MonthComparison records={data.records} adjustments={data.adjustments} today={today} commissionRate={rate} />
 
           <section className="card">
             <div className="card__header">

@@ -3446,3 +3446,19 @@ select {
   color: #533608;
   line-height: 1.5;
 }
+
+/* Сравнение: даты и отсутствие записей видны без интерпретации нулей. */
+.comparison__note {
+  padding: 0 22px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.comparison__scroll { overflow-x: auto; padding: 0 22px 20px; }
+.comparison__table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 13px; }
+.comparison__table th, .comparison__table td { padding: 9px 12px; border-bottom: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; }
+.comparison__table th:first-child { text-align: left; }
+.comparison__table thead th { color: var(--text-secondary); font-weight: 600; }
+.comparison__table thead span { font-size: 11px; font-weight: 400; }
+.comparison__group th { padding-top: 18px; color: var(--text); font-size: 14px; }
+.comparison__counts th, .comparison__counts td { color: var(--text-secondary); font-size: 11px; font-weight: 400; }
