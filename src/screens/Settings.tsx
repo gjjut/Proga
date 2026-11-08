@@ -79,7 +79,7 @@ const FORMULAS: { label: string; value: string }[] = [
   },
   {
     label: 'Цепочка наличных',
-    value: '«касса вчера» = факт прошлой записи; иначе на главном появится предупреждение',
+    value: '«касса вчера» = остаток прошлой записи после НЗ с учётом движений; иначе появится предупреждение',
   },
   {
     label: 'Касса вчера',
@@ -87,7 +87,7 @@ const FORMULAS: { label: string; value: string }[] = [
   },
   {
     label: 'Наличные в кассе',
-    value: 'факт в кассе последней записи ± движения по кассе и НЗ после неё',
+    value: 'нал вечером последней записи − НЗ ± движения по кассе и НЗ после неё',
   },
   { label: 'На терминале', value: 'Σ терминал − комиссия банка ± пополнения и изъятия' },
   {
@@ -114,6 +114,8 @@ export function Settings() {
     importBackup,
     clearAll,
     openDataFolder,
+    chooseBackupFolder,
+    resetBackupFolder,
     openExternal,
     notify,
   } = useApp();
@@ -137,8 +139,9 @@ export function Settings() {
       notify('Ставка должна быть больше 0 и не больше 100%', 'error');
       return;
     }
-    void updateSettings({ commissionRate: parsedRate });
-    notify('Ставка комиссии обновлена', 'success');
+    void updateSettings({ commissionRate: parsedRate }).then((saved) => {
+      if (saved) notify('Ставка комиссии обновлена', 'success');
+    });
   };
 
   return (
@@ -256,6 +259,22 @@ export function Settings() {
           <code className="data-path__value">{info?.dataPath ?? '…'}</code>
         </div>
 
+        {isDesktop && <>
+          <div className="data-path">
+            <span className="data-path__label">Автоматические копии</span>
+            <code className="data-path__value">{info?.backupDirectory ?? '…'}</code>
+          </div>
+          <div className="settings-actions">
+            <button type="button" className="btn btn--ghost" onClick={() => void chooseBackupFolder()}>
+              <FolderIcon size={17} /> <span>Выбрать папку копий</span>
+            </button>
+            <button type="button" className="btn btn--ghost" onClick={() => void resetBackupFolder()}>
+              <span>Папка по умолчанию</span>
+            </button>
+          </div>
+          <p className="settings-note">В каждой папке хранится до 30 дней копий: первая и последняя за день, а также копии перед удалением и восстановлением. Программа делает копии при запуске, изменениях и каждый час, пока открыта. Данные в копиях не зашифрованы. Для облака выберите папку синхронизации; доступность облака приложение не проверяет.</p>
+        </>}
+
         <div className="data-stats">
           <div className="data-stat">
             <span>Записей дней</span>
@@ -306,10 +325,8 @@ export function Settings() {
         <p className="settings-note">
           <ShieldIcon size={16} />
           <span>
-            {recordsLabel(data.records.length)} и {data.adjustments.length} движений. Перед каждой
-            записью автоматически создаётся файл
-            <code> finance-data.backup.json</code> — при повреждении основного файла данные
-            восстановятся из него.
+            {recordsLabel(data.records.length)} и {data.adjustments.length} движений.
+            {isDesktop ? ' Перед перезаписью файла сохраняется предыдущая версия в finance-data.backup.json.' : ' В браузере автоматические копии не создаются — сохраняйте резервную копию вручную.'}
           </span>
         </p>
       </section>

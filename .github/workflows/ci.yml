@@ -43,3 +43,24 @@ jobs:
           npm run build:renderer
           npm run build:electron
 
+
+  package-windows:
+    name: Проверка упаковки Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Установить зависимости
+        run: npm ci
+      - name: Проверить тесты на Windows
+        run: npm test
+      - name: Собрать приложение
+        run: |
+          npm run build:renderer
+          npm run build:electron
+      - name: Упаковать приложение Windows (без установщика)
+        run: npx electron-builder --win --dir --publish never

@@ -3,8 +3,9 @@ import fs from 'node:fs';
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
 import type { AdjustmentInput, DayRecordInput, ExportPayload, IpcResult } from '../shared/api';
 import type { Settings } from '../shared/model';
-import { normalizeData } from '../shared/model';
+import { parseBackupData } from '../shared/model';
 import { DataStore } from './store';
+import { AutoBackup } from './autoBackup';
 import { renderSplashHtml } from './splash';
 
 const APP_TITLE = 'Финансы компаний';
@@ -12,6 +13,7 @@ const devServerUrl = process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(devServerUrl);
 
 let store: DataStore | null = null;
+let backups: AutoBackup | null = null;
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
 /** Минимум, сколько заставка держится на экране — иначе она мигает и раздражает. */
@@ -39,26 +41,67 @@ function handle<T>(channel: string, handler: (...args: never[]) => Promise<T> | 
   });
 }
 
+function getBackups(): AutoBackup {
+  if (!backups) backups = new AutoBackup(getStore().dataDir);
+  return backups;
+}
+
+function appInfo() {
+  const dataStore = getStore();
+  const autoBackup = getBackups();
+  return {
+    version: app.getVersion(),
+    electron: process.versions.electron,
+    platform: process.platform,
+    dataPath: dataStore.dataFile,
+    dataDir: dataStore.dataDir,
+    portable: dataStore.portable,
+    recoveryWarning: dataStore.recoveryWarning,
+    backupDirectory: autoBackup.folder,
+    autoBackupWarning: autoBackup.warning,
+  };
+}
+
+function snapshotAfter<T extends ReturnType<DataStore['load']>>(data: T): T {
+  getBackups().snapshot(data);
+  return data;
+}
+
 function registerIpc(): void {
-  handle('app:info', () => {
-    const dataStore = getStore();
-    return {
-      version: app.getVersion(),
-      electron: process.versions.electron,
-      platform: process.platform,
-      dataPath: dataStore.dataFile,
-      dataDir: dataStore.dataDir,
-      portable: dataStore.portable,
-    };
+  handle('app:info', () => appInfo());
+  handle('data:load', () => {
+    const data = getStore().load();
+    // Leave historical copies untouched until the user has reviewed a recovery.
+    if (!getStore().recoveryWarning) snapshotAfter(data);
+    return data;
+  });
+  handle('data:save-record', (input: DayRecordInput) => snapshotAfter(getStore().saveRecord(input)));
+  handle('data:delete-record', (id: string) => {
+    getBackups().checkpoint(getStore().current());
+    return snapshotAfter(getStore().deleteRecord(id));
+  });
+  handle('data:save-adjustment', (input: AdjustmentInput) => snapshotAfter(getStore().saveAdjustment(input)));
+  handle('data:delete-adjustment', (id: string) => {
+    getBackups().checkpoint(getStore().current());
+    return snapshotAfter(getStore().deleteAdjustment(id));
+  });
+  handle('data:update-settings', (patch: Partial<Settings>) => snapshotAfter(getStore().updateSettings(patch)));
+  handle('data:replace', (raw: unknown) => {
+    getBackups().checkpoint(getStore().current());
+    return snapshotAfter(getStore().replaceData(raw));
   });
 
-  handle('data:load', () => getStore().load());
-  handle('data:save-record', (input: DayRecordInput) => getStore().saveRecord(input));
-  handle('data:delete-record', (id: string) => getStore().deleteRecord(id));
-  handle('data:save-adjustment', (input: AdjustmentInput) => getStore().saveAdjustment(input));
-  handle('data:delete-adjustment', (id: string) => getStore().deleteAdjustment(id));
-  handle('data:update-settings', (patch: Partial<Settings>) => getStore().updateSettings(patch));
-  handle('data:replace', (raw: unknown) => getStore().replaceData(raw));
+  handle('data:choose-backup-folder', async () => {
+    const options = { title: 'Выберите папку для автоматических копий', properties: ['openDirectory' as const, 'createDirectory' as const] };
+    const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
+    if (result.canceled || !result.filePaths[0]) return null;
+    getBackups().setFolder(path.join(result.filePaths[0], 'ZatonFinance-backups'), getStore().current());
+    return appInfo();
+  });
+  handle('data:reset-backup-folder', () => {
+    getBackups().setFolder(getBackups().defaultDir, getStore().current());
+    return appInfo();
+  });
 
   handle('data:export-file', async (payload: ExportPayload) => {
     const window = mainWindow;
@@ -91,7 +134,7 @@ function registerIpc(): void {
     const filePath = result.filePaths[0];
     if (result.canceled || !filePath) return null;
     const raw = JSON.parse(fs.readFileSync(filePath, 'utf8')) as unknown;
-    return normalizeData(raw);
+    return parseBackupData(raw);
   });
 
   handle('data:open-folder', async () => {
@@ -249,7 +292,10 @@ if (!gotSingleInstanceLock) {
   void app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     registerIpc();
-    getStore().load();
+    // If the application stays open overnight, make a snapshot for the new day too.
+    setInterval(() => {
+      try { snapshotAfter(getStore().current()); } catch { /* data has not loaded */ }
+    }, 60 * 60 * 1000);
     createSplash();
     createWindow();
 

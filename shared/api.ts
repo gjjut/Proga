@@ -14,6 +14,9 @@ export interface AppInfo {
   dataPath: string;
   dataDir: string;
   portable: boolean;
+  recoveryWarning?: string;
+  backupDirectory?: string;
+  autoBackupWarning?: string;
 }
 
 export interface ExportPayload {
@@ -40,6 +43,8 @@ export interface FinanceApi {
   exportFile(payload: ExportPayload): Promise<ExportResult>;
   importFile(): Promise<AppData | null>;
   openDataFolder(): Promise<void>;
+  chooseBackupFolder(): Promise<AppInfo | null>;
+  resetBackupFolder(): Promise<AppInfo>;
   openExternal(url: string): Promise<void>;
 }
 

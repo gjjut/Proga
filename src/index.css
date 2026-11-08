@@ -3436,3 +3436,13 @@ select {
     white-space: normal;
   }
 }
+
+.recovery-warning {
+  margin: 16px 24px 0;
+  padding: 14px 18px;
+  border: 1px solid #bb853a;
+  border-radius: 12px;
+  background: #fff2d7;
+  color: #533608;
+  line-height: 1.5;
+}

@@ -308,6 +308,25 @@ export function normalizeData(raw: unknown): AppData {
   };
 }
 
+/** Reject malformed or future backup files instead of silently turning them into empty data. */
+export function parseBackupData(raw: unknown): AppData {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Неверный формат резервной копии');
+  const source = raw as Record<string, unknown>;
+  if (!Array.isArray(source.records) ||
+      (source.adjustments !== undefined && !Array.isArray(source.adjustments))) {
+    throw new Error('Неверный формат резервной копии');
+  }
+  if (typeof source.schemaVersion === 'number' && source.schemaVersion > SCHEMA_VERSION) {
+    throw new Error('Резервная копия создана более новой версией программы');
+  }
+  const result = normalizeData(raw);
+  if (result.records.length !== source.records.length ||
+      result.adjustments.length !== (Array.isArray(source.adjustments) ? source.adjustments.length : 0)) {
+    throw new Error('Резервная копия содержит некорректные или повторяющиеся записи; данные не изменены');
+  }
+  return result;
+}
+
 export function createEmptyData(): AppData {
   return {
     schemaVersion: SCHEMA_VERSION,
