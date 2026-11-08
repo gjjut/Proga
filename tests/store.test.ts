@@ -83,6 +83,21 @@ describe('файловое хранилище', () => {
     },
   );
 
+  it('читает данные v2 и сохраняет категории без изменения денежных полей', () => {
+    const data = createEmptyData();
+    const saved = { ...data, schemaVersion: 2, records: [{ ...record, id: 'r1', note: '', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', expenses: [{ id: 'e1', amount: 50, comment: 'корм' }] }] };
+    put(store.dataFile, JSON.stringify(saved));
+    const loaded = store.load();
+    expect(loaded.records[0].expenses[0].category).toBeUndefined();
+    expect(loaded.records[0].cashFact).toBe(300);
+    store.saveRecord({ ...loaded.records[0], expenses: [{ ...loaded.records[0].expenses[0], category: 'Закупки' }] });
+    const reloaded = new DataStore().load();
+    expect(reloaded.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(reloaded.records[0].cashFact).toBe(300);
+    expect(reloaded.records[0].expenses[0]).toMatchObject({ amount: 50, category: 'Закупки' });
+    expect(JSON.parse(fs.readFileSync(store.backupFile, 'utf8')).schemaVersion).toBe(2);
+  });
+
   it('не заменяет данные более новой версии старой резервной копией', () => {
     const newer = JSON.stringify({ ...createEmptyData(), schemaVersion: SCHEMA_VERSION + 1 });
     put(store.dataFile, newer);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Adjustment, DayRecord } from '../shared/model';
-import { createEmptyData } from '../shared/model';
+import { createEmptyData, SCHEMA_VERSION } from '../shared/model';
 import { buildCsv, buildJsonBackup, csvFilename, jsonBackupFilename } from '../src/lib/csv';
 
 const RATE = 2.75;
@@ -164,7 +164,7 @@ describe('buildJsonBackup', () => {
     const data = createEmptyData();
     data.records.push(record());
     const json = JSON.parse(buildJsonBackup(data));
-    expect(json.schemaVersion).toBe(2);
+    expect(json.schemaVersion).toBe(SCHEMA_VERSION);
     expect(json.records).toHaveLength(1);
     expect(json.records[0].cashFact).toBe(14100);
     expect(json.records[0].cashPrev).toBe(10000);
