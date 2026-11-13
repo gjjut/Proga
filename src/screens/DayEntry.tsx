@@ -42,10 +42,11 @@ interface ExpenseDraft {
   key: string;
   amount: string;
   comment: string;
+  category: string;
 }
 
 function emptyExpense(): ExpenseDraft {
-  return { key: newId(), amount: '', comment: '' };
+  return { key: newId(), amount: '', comment: '', category: '' };
 }
 
 export function DayEntry() {
@@ -103,6 +104,7 @@ export function DayEntry() {
               key: expense.id,
               amount: moneyToInput(expense.amount),
               comment: expense.comment,
+              category: expense.category ?? '',
             }))
           : [emptyExpense()],
       );
@@ -181,6 +183,7 @@ export function DayEntry() {
               key: expense.id,
               amount: moneyToInput(expense.amount),
               comment: expense.comment,
+              category: expense.category ?? '',
             }))
           : [emptyExpense()],
       );
@@ -220,6 +223,7 @@ export function DayEntry() {
         id: expense.key,
         amount: parseMoneyInput(expense.amount),
         comment: expense.comment.trim(),
+        category: expense.category,
       })),
     };
 
@@ -406,6 +410,9 @@ export function DayEntry() {
             </button>
           </div>
 
+          <datalist id="expense-categories">
+            {[...new Set(['Закупки', 'Аренда', 'Топливо', 'Зарплата', 'Коммунальные', 'Прочее', ...data.records.flatMap((record) => record.expenses.map((expense) => expense.category).filter((category): category is string => Boolean(category)))])].map((category) => <option key={category} value={category} />)}
+          </datalist>
           <div className="expense-list">
             {expenses.map((expense, index) => (
               <div className="expense-row" key={expense.key}>
@@ -417,6 +424,16 @@ export function DayEntry() {
                     ariaLabel={`Сумма расхода ${index + 1}`}
                   />
                 </div>
+                <input
+                  className="input expense-row__category"
+                  type="text"
+                  list="expense-categories"
+                  value={expense.category}
+                  maxLength={80}
+                  placeholder="Категория"
+                  aria-label={`Категория расхода ${index + 1}`}
+                  onChange={(event) => patchExpense(expense.key, { category: event.target.value })}
+                />
                 <input
                   className="input expense-row__comment"
                   type="text"

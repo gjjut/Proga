@@ -21,6 +21,8 @@ const financeApi: FinanceApi = {
   exportFile: (payload) => call('data:export-file', payload),
   importFile: () => call('data:import-file'),
   openDataFolder: () => call('data:open-folder'),
+  chooseBackupFolder: () => call('data:choose-backup-folder'),
+  resetBackupFolder: () => call('data:reset-backup-folder'),
   openExternal: (url) => call('window:open-external', url),
 };
 

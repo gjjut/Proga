@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { COMPANIES, companyById, type CompanyId, type DayRecord } from '../../shared/model';
 import { CompanyBadge } from '../components/Badge';
 import { DatePicker } from '../components/DatePicker';
+import { ExpenseSummary } from '../components/ExpenseSummary';
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -225,10 +226,10 @@ export function History() {
             <input
               type="search"
               className="search-field__input"
-              placeholder="По комментариям расходов и дня"
+              placeholder="По категориям и комментариям"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              aria-label="Поиск по комментариям"
+              aria-label="Поиск по категориям и комментариям"
             />
           </label>
         </div>
@@ -268,6 +269,8 @@ export function History() {
           <strong>{formatMoney(current.pots.reserve)}</strong>
         </div>
       </section>
+
+      <ExpenseSummary records={filtered} hint="Все расходы найденных дней; фильтры компании, дат и поиска" />
 
       {filtered.length === 0 ? (
         <section className="card empty-state">
@@ -386,7 +389,7 @@ export function History() {
                         <li key={expense.id}>
                           <span className="expense-view__amount">{formatMoney(expense.amount)}</span>
                           <span className="expense-view__comment">
-                            {expense.comment || 'без комментария'}
+                            {expense.category ? `${expense.category} · ` : ''}{expense.comment || 'без комментария'}
                           </span>
                         </li>
                       ))}

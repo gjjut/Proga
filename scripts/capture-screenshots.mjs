@@ -91,8 +91,6 @@ await page.waitForSelector('.theme-option');
 await shot('settings');
 
 // ── Вторая тема (белая) ──
-// Не считаем критичным: если кнопка не нашлась, просто пропускаем кадры.
-try {
   await page.locator('.theme-option', { hasText: 'Белая' }).first().click();
   await page.waitForTimeout(400);
   await shot('settings-light');
@@ -103,13 +101,18 @@ try {
   // Запись дня в белой теме + календарь
   await navTo('Запись дня');
   await page.waitForSelector('.day-bar', { timeout: 20000 });
+  await shot('day-entry-light');
   await page.locator('button[aria-label="Дата записи"]').click();
   await page.waitForSelector('.date-pop');
   await shot('day-entry-calendar-light');
   await page.keyboard.press('Escape');
-} catch (error) {
-  console.warn('Тему «Белая» снять не удалось:', error.message);
-}
+  await navTo('Поступления');
+  await page.waitForSelector('.adjust-form');
+  await shot('adjustments-light');
+  await navTo('История');
+  await page.waitForSelector('.record-list');
+  await page.locator('.record__toggle').first().click();
+  await shot('history-light');
 
 await browser.close();
 console.log('Готово');

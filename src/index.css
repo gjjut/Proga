@@ -1561,7 +1561,7 @@ select {
 
 .expense-row {
   display: grid;
-  grid-template-columns: 26px minmax(120px, 168px) minmax(0, 1fr) 36px;
+  grid-template-columns: 26px minmax(120px, 168px) minmax(130px, 190px) minmax(0, 1fr) 36px;
   align-items: center;
   gap: 10px;
 }
@@ -2483,6 +2483,7 @@ select {
     grid-template-columns: 20px minmax(0, 1fr) 36px;
     grid-template-areas:
       'idx amount remove'
+      '. category category'
       '. comment comment';
     row-gap: 7px;
   }
@@ -2493,6 +2494,10 @@ select {
 
   .expense-row__amount {
     grid-area: amount;
+  }
+
+  .expense-row__category {
+    grid-area: category;
   }
 
   .expense-row__comment {
@@ -3436,3 +3441,35 @@ select {
     white-space: normal;
   }
 }
+
+.recovery-warning {
+  margin: 16px 24px 0;
+  padding: 14px 18px;
+  border: 1px solid #bb853a;
+  border-radius: 12px;
+  background: #fff2d7;
+  color: #533608;
+  line-height: 1.5;
+}
+
+/* Сравнение: даты и отсутствие записей видны без интерпретации нулей. */
+.comparison__note {
+  padding: 0 22px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.comparison__scroll { overflow-x: auto; padding: 0 22px 20px; }
+.comparison__table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 13px; }
+.comparison__table th, .comparison__table td { padding: 9px 12px; border-bottom: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; }
+.comparison__table th:first-child { text-align: left; }
+.comparison__table thead th { color: var(--text-secondary); font-weight: 600; }
+.comparison__table thead span { font-size: 11px; font-weight: 400; }
+.comparison__group th { padding-top: 18px; color: var(--text); font-size: 14px; }
+.comparison__counts th, .comparison__counts td { color: var(--text-secondary); font-size: 11px; font-weight: 400; }
+
+.expense-summary__scroll { overflow-x: auto; padding: 0 22px 20px; }
+.expense-summary__table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.expense-summary__table th, .expense-summary__table td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; }
+.expense-summary__table th:first-child { text-align: left; overflow-wrap: anywhere; }
+.expense-summary__table thead th { color: var(--text-secondary); font-weight: 600; }

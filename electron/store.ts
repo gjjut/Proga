@@ -4,8 +4,10 @@ import { app } from 'electron';
 import type { AdjustmentInput, AppData, DayRecordInput, Settings } from '../shared/model';
 import {
   createEmptyData,
+  SCHEMA_VERSION,
   normalizeData,
   patchSettings,
+  parseBackupData,
   removeAdjustment,
   removeRecord,
   round2,
@@ -15,6 +17,34 @@ import {
 
 const DATA_FILENAME = 'finance-data.json';
 const BACKUP_FILENAME = 'finance-data.backup.json';
+
+class NewerSchemaError extends Error {}
+
+function fileExists(file: string): boolean {
+  try {
+    fs.statSync(file);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+function readData(file: string): AppData {
+  const raw: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw) ||
+      !Array.isArray((raw as Record<string, unknown>).records)) {
+    throw new Error('Неверный формат файла данных');
+  }
+  const source = raw as Record<string, unknown>;
+  if (typeof source.schemaVersion === 'number' && source.schemaVersion > SCHEMA_VERSION) {
+    throw new NewerSchemaError('Файл создан более новой версией программы');
+  }
+  if (source.adjustments !== undefined && !Array.isArray(source.adjustments)) {
+    throw new Error('Неверный формат движений');
+  }
+  return normalizeData(raw);
+}
 
 /**
  * Хранилище данных: JSON-файл рядом с exe (portable) либо в %APPDATA%.
@@ -27,6 +57,8 @@ export class DataStore {
   readonly backupFile: string;
 
   private data: AppData = createEmptyData();
+  private loaded = false;
+  recoveryWarning: string | undefined;
 
   constructor() {
     const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
@@ -37,52 +69,68 @@ export class DataStore {
   }
 
   load(): AppData {
+    this.loaded = false;
     fs.mkdirSync(this.dataDir, { recursive: true });
+    const mainExists = fileExists(this.dataFile);
+    const backupExists = fileExists(this.backupFile);
 
-    if (fs.existsSync(this.dataFile)) {
+    if (mainExists) {
       try {
-        this.data = normalizeData(JSON.parse(fs.readFileSync(this.dataFile, 'utf8')));
+        this.data = readData(this.dataFile);
+        this.loaded = true;
         return this.data;
       } catch (error) {
+        // Never downgrade or overwrite data made by a newer application.
+        if (error instanceof NewerSchemaError || (error as NodeJS.ErrnoException).code) throw error;
         console.error('Не удалось прочитать файл данных, пробуем резервную копию:', error);
       }
     }
 
-    if (fs.existsSync(this.backupFile)) {
+    if (backupExists) {
+      let restored: AppData;
       try {
-        this.data = normalizeData(JSON.parse(fs.readFileSync(this.backupFile, 'utf8')));
-        this.persist(this.data);
-        return this.data;
+        restored = readData(this.backupFile);
       } catch (error) {
-        console.error('Резервная копия тоже повреждена:', error);
+        console.error('Не удалось прочитать резервную копию:', error);
+        throw new Error(`Не удалось прочитать данные и резервную копию. Файлы не изменены: ${this.dataDir}`);
       }
+      // Preserve the damaged original before replacing it, and never copy it over the good backup.
+      if (mainExists) {
+        const damaged = `${this.dataFile}.corrupted-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        fs.copyFileSync(this.dataFile, damaged, fs.constants.COPYFILE_EXCL);
+      }
+      this.persist(restored, true);
+      this.loaded = true;
+      this.recoveryWarning = 'Данные восстановлены из резервной копии. Последние изменения могут отсутствовать. Проверьте записи и сохраните отдельную копию данных.';
+      return this.data;
     }
 
-    this.data = createEmptyData();
-    if (fs.existsSync(this.dataFile)) {
-      // Файл есть, но битый — сохраняем его для разбора, чтобы не потерять данные безвозвратно.
-      try {
-        fs.copyFileSync(this.dataFile, `${this.dataFile}.corrupted-${Date.now()}`);
-      } catch {
-        /* ignore */
-      }
-      this.persist(this.data);
+    if (mainExists) {
+      throw new Error(`Не удалось прочитать файл данных; резервной копии нет. Файл не изменён: ${this.dataFile}`);
     }
+    this.data = createEmptyData();
+    this.loaded = true;
     return this.data;
   }
 
-  private persist(next: AppData): AppData {
+  private persist(next: AppData, restoring = false): AppData {
+    if (!this.loaded && !restoring) throw new Error('Данные не загружены; сохранение заблокировано');
     fs.mkdirSync(this.dataDir, { recursive: true });
     const tmpFile = `${this.dataFile}.tmp`;
-    fs.writeFileSync(tmpFile, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
-    if (fs.existsSync(this.dataFile)) {
-      try {
-        fs.copyFileSync(this.dataFile, this.backupFile);
-      } catch (error) {
-        console.error('Резервное копирование не удалось:', error);
+    const backupTmp = `${this.backupFile}.tmp`;
+    try {
+      fs.writeFileSync(tmpFile, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+      if (!restoring && fileExists(this.dataFile)) {
+        // Do not damage the previous backup if copying fails midway.
+        fs.copyFileSync(this.dataFile, backupTmp);
+        fs.renameSync(backupTmp, this.backupFile);
+      }
+      fs.renameSync(tmpFile, this.dataFile);
+    } finally {
+      for (const file of [tmpFile, backupTmp]) {
+        try { fs.unlinkSync(file); } catch { /* file is absent or cannot be removed */ }
       }
     }
-    fs.renameSync(tmpFile, this.dataFile);
     this.data = next;
     return this.data;
   }
@@ -108,7 +156,12 @@ export class DataStore {
   }
 
   replaceData(raw: unknown): AppData {
-    return this.persist(normalizeData(raw));
+    return this.persist(parseBackupData(raw));
+  }
+
+  current(): AppData {
+    if (!this.loaded) throw new Error('Данные не загружены');
+    return this.data;
   }
 
   summary(): { records: number; adjustments: number; revenue: number } {

@@ -3,11 +3,12 @@
  * Модуль используется и в main-процессе (Node), и в рендерере (браузер),
  * поэтому здесь нет ни Node-, ни DOM-специфичного кода.
  *
- * Схема v2 (текущая):
+ * Схема v2:
  *   • у записи дня появились «остаток наличных вчера» и «факт в кассе»;
  *   • итог дня = терминал + (факт − вчера) + расходы;
  *   • появились сторонние движения денег (поступления / изъятия);
  *   • комиссия банка задаётся процентом в настройках.
+ * Схема v3: у расходов появилась необязательная категория.
  */
 
 export type CompanyId = 'zaton' | 'artfokus';
@@ -26,6 +27,8 @@ export interface Expense {
   id: string;
   amount: number;
   comment: string;
+  /** Необязательная категория; отсутствует у старых расходов. */
+  category?: string;
 }
 
 export interface DayRecord {
@@ -111,7 +114,7 @@ export const COMPANIES: readonly Company[] = [
   },
 ] as const;
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 export const DEFAULT_COMMISSION_RATE = 2.75;
 
 export function isCompanyId(value: unknown): value is CompanyId {
@@ -184,6 +187,13 @@ function toIsoOrNow(value: unknown): string {
   return new Date().toISOString();
 }
 
+/** Empty or missing category is represented by an absent field, not a guessed category. */
+export function normalizeExpenseCategory(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  const category = raw.replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80).trim();
+  return category.toLocaleLowerCase('ru-RU') === 'без категории' ? '' : category;
+}
+
 function normalizeExpenses(raw: unknown): Expense[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -192,6 +202,7 @@ function normalizeExpenses(raw: unknown): Expense[] {
       id: typeof item.id === 'string' && item.id ? item.id : newId(),
       amount: toMoney(item.amount),
       comment: typeof item.comment === 'string' ? item.comment.trim().slice(0, 400) : '',
+      ...(normalizeExpenseCategory(item.category) ? { category: normalizeExpenseCategory(item.category) } : {}),
     }))
     .filter((item) => item.amount > 0 || item.comment.length > 0);
 }
@@ -308,6 +319,25 @@ export function normalizeData(raw: unknown): AppData {
   };
 }
 
+/** Reject malformed or future backup files instead of silently turning them into empty data. */
+export function parseBackupData(raw: unknown): AppData {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Неверный формат резервной копии');
+  const source = raw as Record<string, unknown>;
+  if (!Array.isArray(source.records) ||
+      (source.adjustments !== undefined && !Array.isArray(source.adjustments))) {
+    throw new Error('Неверный формат резервной копии');
+  }
+  if (typeof source.schemaVersion === 'number' && source.schemaVersion > SCHEMA_VERSION) {
+    throw new Error('Резервная копия создана более новой версией программы');
+  }
+  const result = normalizeData(raw);
+  if (result.records.length !== source.records.length ||
+      result.adjustments.length !== (Array.isArray(source.adjustments) ? source.adjustments.length : 0)) {
+    throw new Error('Резервная копия содержит некорректные или повторяющиеся записи; данные не изменены');
+  }
+  return result;
+}
+
 export function createEmptyData(): AppData {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -339,6 +369,7 @@ export function upsertRecord(data: AppData, input: DayRecordInput): AppData {
           id: expense.id || newId(),
           amount: toMoney(expense.amount),
           comment: typeof expense.comment === 'string' ? expense.comment.trim().slice(0, 400) : '',
+          ...(normalizeExpenseCategory(expense.category) ? { category: normalizeExpenseCategory(expense.category) } : {}),
         }))
         .filter((expense) => expense.amount > 0 || expense.comment.length > 0)
     : [];

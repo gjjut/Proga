@@ -9,6 +9,7 @@ import {
 import { round2 } from '../../shared/model';
 import { formatDateShort } from './format';
 import { dayMetrics, sortByDateAsc, totalsOf } from './calc';
+import { expenseCategories } from './expenses';
 
 function escapeCell(value: string): string {
   if (/[;"\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
@@ -104,7 +105,7 @@ export function buildCsv(
       .map(
         (expense) =>
           `${(Math.round(expense.amount * 100) / 100).toFixed(2).replace('.', ',')} — ${
-            expense.comment || 'без комментария'
+            expense.category ? `${expense.category} · ${expense.comment || 'без комментария'}` : expense.comment || 'без комментария'
           }`,
       )
       .join('; ');
@@ -127,6 +128,17 @@ export function buildCsv(
         record.note,
       ]),
     );
+  }
+
+  const categories = expenseCategories(sorted);
+  if (categories.length > 0) {
+    lines.push('');
+    lines.push(row(['РАСХОДЫ ПО КАТЕГОРИЯМ']));
+    lines.push(row(['Категория', 'Строк расходов', 'Сумма, ₽']));
+    for (const category of categories) {
+      // Prefix user-controlled text so spreadsheets cannot interpret it as a formula.
+      lines.push(row([`Категория: ${category.category}`, category.count, category.amount]));
+    }
   }
 
   if (sortedAdjustments.length > 0) {

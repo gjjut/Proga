@@ -22,7 +22,7 @@ interface StoredData {
     terminal: number;
     cashFact: number;
     reserve: number;
-    expenses: { amount: number; comment: string }[];
+    expenses: { amount: number; comment: string; category?: string }[];
   }[];
   adjustments: {
     id: string;
@@ -237,9 +237,11 @@ describe('Приложение целиком', () => {
 
     const expenseInputs = [...container.querySelectorAll<HTMLInputElement>('.expense-row .input--money')];
     const comment = container.querySelector<HTMLInputElement>('.expense-row__comment');
+    const category = container.querySelector<HTMLInputElement>('.expense-row__category');
     await act(async () => {
       if (expenseInputs[0]) setInputValue(expenseInputs[0], '3400');
       if (comment) setInputValue(comment, 'Корм для рыбалки');
+      if (category) setInputValue(category, 'Закупки');
     });
     await settle();
 
@@ -268,7 +270,24 @@ describe('Приложение целиком', () => {
     expect(saved?.terminal).toBe(48200);
     expect(saved?.cashFact).toBe(9600);
     expect(saved?.reserve).toBe(4500);
-    expect(saved?.expenses[0]).toMatchObject({ amount: 3400, comment: 'Корм для рыбалки' });
+    expect(saved?.expenses[0]).toMatchObject({ amount: 3400, comment: 'Корм для рыбалки', category: 'Закупки' });
+    await act(async () => { buttonByText('Сбросить')?.click(); });
+    expect(container.querySelector<HTMLInputElement>('.expense-row__category')?.value).toBe('Закупки');
+
+    await navTo('История');
+    await act(async () => { buttonByText('Всё время')?.click(); });
+    const search = container.querySelector<HTMLInputElement>('input[aria-label="Поиск по категориям и комментариям"]');
+    await act(async () => { if (search) setInputValue(search, 'Закупки'); });
+    await settle();
+    expect(container.querySelectorAll('.record')).toHaveLength(1);
+    const summary = container.querySelector('.expense-summary');
+    expect(summary?.textContent).toContain('Закупки');
+    expect(summary?.textContent).toMatch(/3\s400/);
+    await act(async () => { container.querySelector<HTMLButtonElement>('.record__toggle')?.click(); });
+    expect(container.querySelector('.expense-view')?.textContent).toContain('Закупки');
+    await act(async () => { buttonByText('Изменить')?.click(); });
+    await settle();
+    expect(container.querySelector<HTMLInputElement>('.expense-row__category')?.value).toBe('Закупки');
   });
 
   it('открывает свой календарь в стиле приложения и выбирает день', async () => {
